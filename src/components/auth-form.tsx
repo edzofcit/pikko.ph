@@ -22,6 +22,7 @@ export function AuthForm({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isSignUp = mode === "sign-up";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -106,14 +107,35 @@ export function AuthForm({
         </label>
         <label className="block text-sm font-bold">
           Password
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 font-normal"
-          />
+          <span className="relative mt-2 block">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={8}
+              autoComplete={isSignUp ? "new-password" : "current-password"}
+              className="w-full rounded-xl border border-[var(--line)] py-3 pl-4 pr-12 font-normal"
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              title={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[var(--text-muted)] hover:text-[var(--forest)]"
+            >
+              {showPassword ? (
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.4A10.8 10.8 0 0 1 12 4.2c4.7 0 8.3 3.7 9.5 7.1.2.5.2.9 0 1.4a12.8 12.8 0 0 1-2.4 3.8M6.2 6.2A12.4 12.4 0 0 0 2.5 11.3c-.2.5-.2.9 0 1.4 1.2 3.4 4.8 7.1 9.5 7.1 1.3 0 2.5-.3 3.6-.8" />
+                </svg>
+              ) : (
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.5 11.3C3.7 7.9 7.3 4.2 12 4.2s8.3 3.7 9.5 7.1c.2.5.2.9 0 1.4-1.2 3.4-4.8 7.1-9.5 7.1s-8.3-3.7-9.5-7.1a2 2 0 0 1 0-1.4Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </span>
         </label>
       </div>
 
