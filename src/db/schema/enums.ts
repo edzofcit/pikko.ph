@@ -13,6 +13,8 @@ export const userStatusEnum = pgEnum("user_status", [
   "suspended",
 ]);
 
+export const platformRoleEnum = pgEnum("platform_role", ["admin"]);
+
 export const merchantRoleEnum = pgEnum("merchant_role", [
   "owner",
   "site_manager",

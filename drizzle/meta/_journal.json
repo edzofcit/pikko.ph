@@ -15,6 +15,13 @@
       "when": 1785597056293,
       "tag": "20260801151056_late_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785598709742,
+      "tag": "20260801153829_slippery_rhino",
+      "breakpoints": true
     }
   ]
 }
