@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import { merchantMemberships, merchants } from "@/db/schema";
 import { syncCurrentUser } from "@/lib/auth/access";
-import { toSlug } from "@/lib/slug";
+import { toPublicMerchantSlug } from "@/lib/slug";
 
 function onboardingUrl(error: "invalid" | "membership-exists") {
   return `/merchant/onboarding?error=${error}`;
@@ -48,7 +48,7 @@ export async function createMerchantAccount(formData: FormData) {
 
   const merchantId = randomUUID();
   const membershipId = randomUUID();
-  const baseSlug = toSlug(displayName, "merchant");
+  const baseSlug = toPublicMerchantSlug(displayName);
   const [slugTaken] = await db
     .select({ id: merchants.id })
     .from(merchants)

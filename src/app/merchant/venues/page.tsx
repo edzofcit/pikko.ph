@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
@@ -36,6 +37,7 @@ export default async function MerchantVenuesPage({
           .select({
             id: sites.id,
             name: sites.name,
+            slug: sites.slug,
             city: sites.city,
             province: sites.province,
           })
@@ -213,6 +215,12 @@ export default async function MerchantVenuesPage({
                     {siteCourts.length} {siteCourts.length === 1 ? "court" : "courts"}
                   </span>
                 </div>
+                <Link
+                  href={`/${access.membership.merchantSlug}/${site.slug}`}
+                  className="mt-3 inline-flex text-xs font-black text-[var(--forest)] underline underline-offset-4"
+                >
+                  View public availability
+                </Link>
                 {siteCourts.length > 0 ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {siteCourts.map((court) => (

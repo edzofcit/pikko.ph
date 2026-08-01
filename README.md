@@ -8,6 +8,8 @@ This first application baseline includes:
 
 - Next.js App Router with TypeScript and Tailwind CSS.
 - A mobile-first public booking preview with selectable hourly court slots.
+- Real public merchant and site routes backed by tenant-scoped court, schedule,
+  allocation, and pricing data.
 - Merchant and platform-administrator dashboard shells.
 - A Vercel-friendly health endpoint at `/api/health`.
 - A Neon PostgreSQL schema managed with Drizzle migrations.
@@ -16,7 +18,9 @@ This first application baseline includes:
 - Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
-The displayed courts, prices, and dashboard metrics are still sample UI data. The database foundation is ready for the booking services that will persist them.
+The landing-page preview and dashboard metrics still contain sample presentation
+data. Public routes at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}` now
+use persisted venue data and revalidate selected slots before checkout review.
 
 ## Run locally
 
