@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 
@@ -20,7 +19,6 @@ export function AuthForm({
   mode: "sign-in" | "sign-up";
   callbackUrl: string;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -56,8 +54,9 @@ export function AuthForm({
         return;
       }
 
-      router.replace(callbackUrl);
-      router.refresh();
+      // Start a fresh document request so the protected destination is checked
+      // with the session cookie that the auth response just issued.
+      window.location.assign(callbackUrl);
     } catch (authenticationError) {
       setError(getAuthenticationErrorMessage(authenticationError));
     } finally {
