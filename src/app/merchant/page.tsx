@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { formatMerchantRole } from "@/lib/auth/permissions";
 import { getMerchantAccess } from "@/lib/auth/access";
@@ -22,33 +22,7 @@ export default async function MerchantPage() {
   }
 
   if (!access.membership) {
-    return (
-      <DashboardShell
-        eyebrow="Merchant workspace"
-        title={`Welcome, ${access.user.fullName}.`}
-        description="Your account is signed in, but it has not been assigned to a merchant yet. Ask a merchant owner or Pikko.ph administrator to invite this email address."
-        metrics={[
-          { label: "Merchant access", value: "Pending", note: access.user.email },
-          { label: "Assigned sites", value: "0", note: "Waiting for an invitation" },
-          { label: "Permissions", value: "0", note: "Granted with your role" },
-          { label: "Account", value: "Active", note: "Authentication is working" },
-        ]}
-      >
-        <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-6">
-          <h2 className="font-bold">What happens next?</h2>
-          <p className="mt-2 max-w-2xl leading-7 text-[var(--text-muted)]">
-            A merchant owner assigns your role and sites. Once assigned, reload
-            this dashboard to see the venue workspace.
-          </p>
-          <Link
-            href="/"
-            className="mt-5 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-bold text-white"
-          >
-            Return to marketplace
-          </Link>
-        </section>
-      </DashboardShell>
-    );
+    redirect("/merchant/onboarding");
   }
 
   const role = formatMerchantRole(access.membership.role);
@@ -60,7 +34,12 @@ export default async function MerchantPage() {
       eyebrow={`Merchant workspace · ${access.membership.merchantName}`}
       title={`Welcome back, ${access.user.fullName}.`}
       description={`${role} access${siteNames ? ` for ${siteNames}` : ""}. Your role controls every dashboard page and server action.`}
-      navigation={canManageStaff ? [{ href: "/merchant/team", label: "Team" }] : []}
+      navigation={[
+        ...(access.permissions.includes("manage_courts")
+          ? [{ href: "/merchant/venues", label: "Sites & courts" }]
+          : []),
+        ...(canManageStaff ? [{ href: "/merchant/team", label: "Team" }] : []),
+      ]}
       metrics={[
         { label: "Today’s bookings", value: "18", note: "+4 versus last Saturday" },
         { label: "Collected today", value: "₱12.8k", note: "14 paid bookings" },

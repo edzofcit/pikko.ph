@@ -1,0 +1,175 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getDb } from "@/db";
+import { courts, siteOperatingHours, sites } from "@/db/schema";
+import { requireMerchantPermission } from "@/lib/auth/access";
+import { toSlug } from "@/lib/slug";
+
+type VenueMessage =
+  | "court-created"
+  | "invalid-court"
+  | "invalid-site"
+  | "site-created";
+
+function venuesUrl(message: VenueMessage) {
+  const parameter = message.endsWith("created") ? "success" : "error";
+  return `/merchant/venues?${parameter}=${message}`;
+}
+
+function parseHourlyRate(value: FormDataEntryValue | null) {
+  const amount = Number(String(value ?? ""));
+
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) {
+    return null;
+  }
+
+  return Math.round(amount * 100);
+}
+
+export async function createSite(formData: FormData) {
+  const access = await requireMerchantPermission("manage_courts");
+
+  if (access.membership.role !== "owner") {
+    redirect("/access-denied");
+  }
+
+  const merchantId = access.membership.merchantId;
+  const name = String(formData.get("name") ?? "").trim();
+  const addressLine1 = String(formData.get("addressLine1") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+  const province = String(formData.get("province") ?? "").trim();
+  const opensAt = String(formData.get("opensAt") ?? "");
+  const closesAt = String(formData.get("closesAt") ?? "");
+
+  if (
+    name.length < 2 ||
+    name.length > 160 ||
+    addressLine1.length < 4 ||
+    addressLine1.length > 200 ||
+    city.length < 2 ||
+    city.length > 100 ||
+    province.length > 100 ||
+    !/^\d{2}:\d{2}$/.test(opensAt) ||
+    !/^\d{2}:\d{2}$/.test(closesAt) ||
+    opensAt >= closesAt
+  ) {
+    redirect(venuesUrl("invalid-site"));
+  }
+
+  const db = getDb();
+  const siteId = randomUUID();
+  const baseSlug = toSlug(name, "site");
+  const [slugTaken] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(
+      and(
+        eq(sites.merchantId, merchantId),
+        sql`lower(${sites.slug}) = ${baseSlug}`,
+      ),
+    )
+    .limit(1);
+  const slug = slugTaken ? `${baseSlug}-${siteId.slice(0, 8)}` : baseSlug;
+
+  await db.batch([
+    db.insert(sites).values({
+      id: siteId,
+      merchantId,
+      name,
+      slug,
+      status: "active",
+      addressLine1,
+      city,
+      province: province || null,
+      contactEmail: access.user.email,
+    }),
+    db.insert(siteOperatingHours).values(
+      Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        merchantId,
+        siteId,
+        dayOfWeek,
+        opensAt,
+        closesAt,
+      })),
+    ),
+  ]);
+
+  revalidatePath("/merchant");
+  revalidatePath("/merchant/venues");
+  redirect(venuesUrl("site-created"));
+}
+
+export async function createCourt(formData: FormData) {
+  const access = await requireMerchantPermission("manage_courts");
+  const merchantId = access.membership.merchantId;
+  const siteId = String(formData.get("siteId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const surfaceType = String(formData.get("surfaceType") ?? "").trim();
+  const baseHourlyRateCents = parseHourlyRate(formData.get("hourlyRate"));
+  const indoor = formData.get("indoor") === "on";
+
+  if (
+    !siteId ||
+    name.length < 2 ||
+    name.length > 120 ||
+    surfaceType.length > 100 ||
+    baseHourlyRateCents === null
+  ) {
+    redirect(venuesUrl("invalid-court"));
+  }
+
+  if (!access.sites.some((site) => site.id === siteId)) {
+    redirect(venuesUrl("invalid-court"));
+  }
+
+  const db = getDb();
+  const [ownedSite] = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(
+      and(
+        eq(sites.id, siteId),
+        eq(sites.merchantId, merchantId),
+        eq(sites.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  if (!ownedSite) {
+    redirect(venuesUrl("invalid-court"));
+  }
+
+  const courtId = randomUUID();
+  const baseSlug = toSlug(name, "court");
+  const [slugTaken] = await db
+    .select({ id: courts.id })
+    .from(courts)
+    .where(
+      and(
+        eq(courts.siteId, siteId),
+        sql`lower(${courts.slug}) = ${baseSlug}`,
+      ),
+    )
+    .limit(1);
+  const slug = slugTaken ? `${baseSlug}-${courtId.slice(0, 8)}` : baseSlug;
+
+  await db.insert(courts).values({
+    id: courtId,
+    merchantId,
+    siteId,
+    name,
+    slug,
+    baseHourlyRateCents,
+    surfaceType: surfaceType || null,
+    indoor,
+    status: "active",
+  });
+
+  revalidatePath("/merchant");
+  revalidatePath("/merchant/venues");
+  redirect(venuesUrl("court-created"));
+}
