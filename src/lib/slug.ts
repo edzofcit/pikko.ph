@@ -10,3 +10,19 @@ export function toSlug(value: string, fallback = "venue") {
 
   return slug || fallback;
 }
+
+const RESERVED_MERCHANT_SLUGS = new Set([
+  "access-denied",
+  "admin",
+  "api",
+  "auth",
+  "favicon-ico",
+  "icon-svg",
+  "merchant",
+  "next",
+]);
+
+export function toPublicMerchantSlug(value: string) {
+  const slug = toSlug(value, "pickleball-club");
+  return RESERVED_MERCHANT_SLUGS.has(slug) ? `${slug}-club` : slug;
+}
