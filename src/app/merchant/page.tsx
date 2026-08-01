@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { formatMerchantRole } from "@/lib/auth/permissions";
+import { getMerchantAccess } from "@/lib/auth/access";
 
 export const metadata: Metadata = { title: "Merchant dashboard" };
 
@@ -9,12 +12,55 @@ const bookings = [
   ["PK-1050", "Center Court", "8:00–9:00 PM", "Walk-in", "₱650"],
 ];
 
-export default function MerchantPage() {
+export const dynamic = "force-dynamic";
+
+export default async function MerchantPage() {
+  const access = await getMerchantAccess();
+
+  if (!access?.user) {
+    return null;
+  }
+
+  if (!access.membership) {
+    return (
+      <DashboardShell
+        eyebrow="Merchant workspace"
+        title={`Welcome, ${access.user.fullName}.`}
+        description="Your account is signed in, but it has not been assigned to a merchant yet. Ask a merchant owner or Pikko.ph administrator to invite this email address."
+        metrics={[
+          { label: "Merchant access", value: "Pending", note: access.user.email },
+          { label: "Assigned sites", value: "0", note: "Waiting for an invitation" },
+          { label: "Permissions", value: "0", note: "Granted with your role" },
+          { label: "Account", value: "Active", note: "Authentication is working" },
+        ]}
+      >
+        <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-6">
+          <h2 className="font-bold">What happens next?</h2>
+          <p className="mt-2 max-w-2xl leading-7 text-[var(--text-muted)]">
+            A merchant owner assigns your role and sites. Once assigned, reload
+            this dashboard to see the venue workspace.
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-bold text-white"
+          >
+            Return to marketplace
+          </Link>
+        </section>
+      </DashboardShell>
+    );
+  }
+
+  const role = formatMerchantRole(access.membership.role);
+  const siteNames = access.sites.map((site) => site.name).join(", ");
+  const canManageStaff = access.permissions.includes("manage_staff");
+
   return (
     <DashboardShell
-      eyebrow="Merchant workspace · The Kitchen"
-      title="Good afternoon, Marco."
-      description="A first look at the venue operations workspace for bookings, payments, courts, pricing, staff, and reports."
+      eyebrow={`Merchant workspace · ${access.membership.merchantName}`}
+      title={`Welcome back, ${access.user.fullName}.`}
+      description={`${role} access${siteNames ? ` for ${siteNames}` : ""}. Your role controls every dashboard page and server action.`}
+      navigation={canManageStaff ? [{ href: "/merchant/team", label: "Team" }] : []}
       metrics={[
         { label: "Today’s bookings", value: "18", note: "+4 versus last Saturday" },
         { label: "Collected today", value: "₱12.8k", note: "14 paid bookings" },
@@ -26,7 +72,7 @@ export default function MerchantPage() {
         <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <div>
             <h2 className="font-bold">Upcoming bookings</h2>
-            <p className="mt-1 text-xs text-[var(--muted)]">Saturday, August 8 · BGC site</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Saturday, August 8 · Assigned sites</p>
           </div>
           <button type="button" className="text-sm font-bold text-[var(--forest)]">View calendar</button>
         </div>
@@ -35,7 +81,7 @@ export default function MerchantPage() {
             <div key={reference} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[0.8fr_1fr_1.2fr_1fr_0.6fr] sm:items-center">
               <span className="font-mono text-xs font-bold">{reference}</span>
               <span className="font-semibold">{court}</span>
-              <span className="text-[var(--muted)]">{time}</span>
+              <span className="text-[var(--text-muted)]">{time}</span>
               <span className="w-fit rounded-full bg-[var(--mint)] px-2.5 py-1 text-xs font-bold text-[var(--forest)]">{state}</span>
               <span className="font-bold sm:text-right">{amount}</span>
             </div>

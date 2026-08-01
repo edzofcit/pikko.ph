@@ -14,6 +14,7 @@ import { timestamps } from "./common";
 import {
   merchantRoleEnum,
   merchantStatusEnum,
+  platformRoleEnum,
   subscriptionStatusEnum,
   userStatusEnum,
 } from "./enums";
@@ -62,15 +63,18 @@ export const users = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     email: varchar("email", { length: 320 }).notNull(),
+    authSubject: varchar("auth_subject", { length: 160 }),
     fullName: varchar("full_name", { length: 160 }).notNull(),
     mobileNumber: varchar("mobile_number", { length: 40 }),
     status: userStatusEnum("status").default("invited").notNull(),
+    platformRole: platformRoleEnum("platform_role"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("users_email_uidx").on(sql`lower(${table.email})`),
+    uniqueIndex("users_auth_subject_uidx").on(table.authSubject),
   ],
 );
 

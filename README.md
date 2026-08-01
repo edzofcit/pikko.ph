@@ -12,6 +12,7 @@ This first application baseline includes:
 - A Vercel-friendly health endpoint at `/api/health`.
 - A Neon PostgreSQL schema managed with Drizzle migrations.
 - Tenant-scoped foreign keys and a database-level court overlap guard.
+- Neon Auth sign-in with Pikko-managed platform, merchant-role, and site permissions.
 - Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
@@ -53,6 +54,8 @@ npm run db:migrate
 ```
 
 Never commit `.env.local`, and never use Drizzle `push` against Preview or Production. Preview seed data requires `ALLOW_DATABASE_SEED=true` and the seed script refuses to run when `VERCEL_ENV=production`.
+
+Neon provisions `NEON_AUTH_BASE_URL`. Add a unique `NEON_AUTH_COOKIE_SECRET` of at least 32 random characters to each environment. `PIKKO_PLATFORM_ADMIN_EMAILS` is an optional comma-separated allowlist that promotes matching verified identities to platform administrator when they sign in. Merchant staff are invited from `/merchant/team`; non-owner roles require at least one assigned site.
 
 Vercel runs committed migrations before each build. Drizzle records applied migrations, so unchanged migrations are skipped. A failed migration stops the deployment before the new application version goes live.
 

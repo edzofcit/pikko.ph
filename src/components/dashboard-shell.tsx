@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountButton } from "@/components/account-button";
 import { Brand } from "@/components/brand";
 
 type Metric = { label: string; value: string; note: string };
@@ -8,12 +9,14 @@ export function DashboardShell({
   title,
   description,
   metrics,
+  navigation = [],
   children,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   metrics: Metric[];
+  navigation?: { href: string; label: string }[];
   children: React.ReactNode;
 }) {
   return (
@@ -22,10 +25,19 @@ export function DashboardShell({
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
           <Brand />
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-[var(--muted)] sm:inline">Prototype dashboard</span>
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="hidden rounded-full px-3 py-2 text-sm font-bold text-[var(--forest)] hover:bg-[var(--cream)] sm:inline-flex"
+              >
+                {item.label}
+              </Link>
+            ))}
             <Link href="/" className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-bold hover:bg-[var(--cream)]">
               View marketplace
             </Link>
+            <AccountButton />
           </div>
         </div>
       </header>
@@ -35,7 +47,7 @@ export function DashboardShell({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--coral)]">{eyebrow}</p>
             <h1 className="display-type mt-3 text-4xl font-black sm:text-5xl">{title}</h1>
-            <p className="mt-4 max-w-2xl leading-7 text-[var(--muted)]">{description}</p>
+            <p className="mt-4 max-w-2xl leading-7 text-[var(--text-muted)]">{description}</p>
           </div>
           <button type="button" className="w-fit rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-bold text-white">
             + New action
@@ -45,7 +57,7 @@ export function DashboardShell({
         <section className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Summary metrics">
           {metrics.map((metric) => (
             <article key={metric.label} className="rounded-2xl border border-[var(--line)] bg-white p-5">
-              <p className="text-xs font-semibold text-[var(--muted)]">{metric.label}</p>
+              <p className="text-xs font-semibold text-[var(--text-muted)]">{metric.label}</p>
               <p className="mt-3 text-3xl font-black tracking-[-0.05em]">{metric.value}</p>
               <p className="mt-2 text-xs text-[var(--forest)]">{metric.note}</p>
             </article>
