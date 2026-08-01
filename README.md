@@ -2,7 +2,7 @@
 
 Pikko.ph is a multi-tenant pickleball court discovery, booking, and merchant operations platform for the Philippines.
 
-## Current scaffold
+## Current foundation
 
 This first application baseline includes:
 
@@ -10,10 +10,12 @@ This first application baseline includes:
 - A mobile-first public booking preview with selectable hourly court slots.
 - Merchant and platform-administrator dashboard shells.
 - A Vercel-friendly health endpoint at `/api/health`.
-- Environment placeholders for PostgreSQL, authentication, Maya, and email.
+- A Neon PostgreSQL schema managed with Drizzle migrations.
+- Tenant-scoped foreign keys and a database-level court overlap guard.
+- Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
-The displayed courts, prices, and dashboard metrics are sample data. No payment or booking is persisted yet.
+The displayed courts, prices, and dashboard metrics are still sample UI data. The database foundation is ready for the booking services that will persist them.
 
 ## Run locally
 
@@ -32,16 +34,37 @@ npm run lint
 npm run build
 ```
 
+## Database workflow
+
+The Vercel project uses the Vercel-managed Neon integration. Vercel does not expose managed sensitive values through `env pull`. To run migrations locally, put a Development-only Neon connection string in the gitignored `.env.local`:
+
+```bash
+cp .env.example .env.local
+# Replace DATABASE_URL with a Development database connection string.
+npm run db:migrate
+```
+
+Schema changes live in `src/db/schema`. Generate and validate a migration before applying it:
+
+```bash
+npm run db:generate
+npm run db:check
+npm run db:migrate
+```
+
+Never commit `.env.local`, and never use Drizzle `push` against Preview or Production. Preview seed data requires `ALLOW_DATABASE_SEED=true` and the seed script refuses to run when `VERCEL_ENV=production`.
+
+Vercel runs committed migrations before each build. Drizzle records applied migrations, so unchanged migrations are skipped. A failed migration stops the deployment before the new application version goes live.
+
 ## Deployment
 
 Import the GitHub repository into Vercel. Next.js build settings are detected automatically. Configure secrets in Vercel for Preview and Production rather than committing `.env.local`.
 
 ## Planned implementation sequence
 
-1. PostgreSQL schema and tenant-safe data access.
-2. Merchant authentication, staff roles, and site assignments.
-3. Sites, courts, hours, closures, and pricing rules.
-4. Atomic availability holds and booking state transitions.
-5. Maya Dynamic QR Ph payment adapter and webhook reconciliation.
-6. Manual payment proof workflow and transactional email.
-7. Reporting, subscriptions, audit trail, and production hardening.
+1. Merchant authentication, staff roles, and site assignments.
+2. Sites, courts, hours, closures, and pricing services.
+3. Atomic availability holds and booking state transitions.
+4. Maya Dynamic QR Ph payment adapter and webhook reconciliation.
+5. Manual payment proof workflow and transactional email.
+6. Reporting, subscriptions, audit trail, and production hardening.
