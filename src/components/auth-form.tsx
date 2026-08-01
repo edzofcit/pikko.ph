@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 
+function getAuthenticationErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Authentication failed. Please try again.";
+}
+
 export function AuthForm({
   mode,
   callbackUrl,
@@ -14,6 +22,7 @@ export function AuthForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const isSignUp = mode === "sign-up";
 
@@ -21,24 +30,39 @@ export function AuthForm({
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setNotice(null);
 
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
     const name = String(formData.get("name") ?? "").trim();
 
-    const result = isSignUp
-      ? await authClient.signUp.email({ email, password, name })
-      : await authClient.signIn.email({ email, password });
+    try {
+      const result = isSignUp
+        ? await authClient.signUp.email({ email, password, name })
+        : await authClient.signIn.email({ email, password });
 
-    if (result.error) {
-      setError(result.error.message || "Authentication failed. Please try again.");
+      if (result.error) {
+        setError(
+          result.error.message || "Authentication failed. Please try again.",
+        );
+        return;
+      }
+
+      if (isSignUp && !result.data.token) {
+        setNotice(
+          "Account created. Check your email to verify it, then return here to sign in.",
+        );
+        return;
+      }
+
+      router.replace(callbackUrl);
+      router.refresh();
+    } catch (authenticationError) {
+      setError(getAuthenticationErrorMessage(authenticationError));
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    router.replace(callbackUrl);
-    router.refresh();
   }
 
   return (
@@ -97,6 +121,15 @@ export function AuthForm({
       {error ? (
         <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800" role="alert">
           {error}
+        </p>
+      ) : null}
+
+      {notice ? (
+        <p
+          className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+          role="status"
+        >
+          {notice}
         </p>
       ) : null}
 
