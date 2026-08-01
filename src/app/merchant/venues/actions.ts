@@ -11,12 +11,18 @@ import { toSlug } from "@/lib/slug";
 
 type VenueMessage =
   | "court-created"
+  | "court-updated"
   | "invalid-court"
   | "invalid-site"
   | "site-created";
 
 function venuesUrl(message: VenueMessage) {
-  const parameter = message.endsWith("created") ? "success" : "error";
+  const parameter =
+    message === "court-created" ||
+    message === "court-updated" ||
+    message === "site-created"
+      ? "success"
+      : "error";
   return `/merchant/venues?${parameter}=${message}`;
 }
 
@@ -172,4 +178,67 @@ export async function createCourt(formData: FormData) {
   revalidatePath("/merchant");
   revalidatePath("/merchant/venues");
   redirect(venuesUrl("court-created"));
+}
+
+export async function updateCourt(formData: FormData) {
+  const access = await requireMerchantPermission("manage_courts");
+  const merchantId = access.membership.merchantId;
+  const courtId = String(formData.get("courtId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const surfaceType = String(formData.get("surfaceType") ?? "").trim();
+  const baseHourlyRateCents = parseHourlyRate(formData.get("hourlyRate"));
+  const indoor = formData.get("indoor") === "on";
+  const status = String(formData.get("status") ?? "");
+  const allowedStatuses = new Set(["active", "inactive", "maintenance"]);
+
+  if (
+    !courtId ||
+    name.length < 2 ||
+    name.length > 120 ||
+    surfaceType.length > 100 ||
+    baseHourlyRateCents === null ||
+    !allowedStatuses.has(status)
+  ) {
+    redirect(venuesUrl("invalid-court"));
+  }
+
+  const db = getDb();
+  const [ownedCourt] = await db
+    .select({ siteId: courts.siteId, siteSlug: sites.slug })
+    .from(courts)
+    .innerJoin(
+      sites,
+      and(
+        eq(sites.id, courts.siteId),
+        eq(sites.merchantId, courts.merchantId),
+      ),
+    )
+    .where(and(eq(courts.id, courtId), eq(courts.merchantId, merchantId)))
+    .limit(1);
+
+  if (
+    !ownedCourt ||
+    !access.sites.some((site) => site.id === ownedCourt.siteId)
+  ) {
+    redirect(venuesUrl("invalid-court"));
+  }
+
+  await db
+    .update(courts)
+    .set({
+      name,
+      baseHourlyRateCents,
+      surfaceType: surfaceType || null,
+      indoor,
+      status: status as "active" | "inactive" | "maintenance",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(courts.id, courtId), eq(courts.merchantId, merchantId)));
+
+  revalidatePath("/merchant");
+  revalidatePath("/merchant/venues");
+  revalidatePath(
+    `/${access.membership.merchantSlug}/${ownedCourt.siteSlug}`,
+  );
+  redirect(venuesUrl("court-updated"));
 }

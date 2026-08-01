@@ -6,7 +6,7 @@ import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatMerchantRole } from "@/lib/auth/permissions";
-import { createCourt, createSite } from "./actions";
+import { createCourt, createSite, updateCourt } from "./actions";
 
 export const metadata: Metadata = { title: "Sites and courts" };
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ const feedback = {
     "Merchant account created. Add your first venue site, then its courts.",
   "site-created": "Site created with daily operating hours.",
   "court-created": "Court created and ready for scheduling.",
+  "court-updated": "Court details and availability status updated.",
   "invalid-site": "Check the site details and operating hours.",
   "invalid-court": "Check the site, court name, and hourly rate.",
 } as const;
@@ -58,12 +59,12 @@ export default async function MerchantVenuesPage({
             rateCents: courts.baseHourlyRateCents,
             indoor: courts.indoor,
             surfaceType: courts.surfaceType,
+            status: courts.status,
           })
           .from(courts)
           .where(
             and(
               eq(courts.merchantId, access.membership.merchantId),
-              eq(courts.status, "active"),
               inArray(courts.siteId, allowedSiteIds),
             ),
           )
@@ -89,7 +90,7 @@ export default async function MerchantVenuesPage({
       ]}
       metrics={[
         { label: "Active sites", value: String(venueSites.length), note: "Physical venue locations" },
-        { label: "Active courts", value: String(venueCourts.length), note: "Bookable inventory" },
+        { label: "Active courts", value: String(venueCourts.filter((court) => court.status === "active").length), note: "Bookable inventory" },
         { label: "Currency", value: "PHP", note: "Rates shown per hour" },
         { label: "Your role", value: formatMerchantRole(access.membership.role), note: access.user.email },
       ]}
@@ -212,7 +213,7 @@ export default async function MerchantVenuesPage({
                     </p>
                   </div>
                   <span className="rounded-full bg-[var(--mint)] px-2.5 py-1 text-xs font-bold text-[var(--forest)]">
-                    {siteCourts.length} {siteCourts.length === 1 ? "court" : "courts"}
+                    {siteCourts.filter((court) => court.status === "active").length} active · {siteCourts.length} total
                   </span>
                 </div>
                 <Link
@@ -225,13 +226,91 @@ export default async function MerchantVenuesPage({
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {siteCourts.map((court) => (
                       <div key={court.id} className="rounded-xl border border-[var(--line)] p-4 text-sm">
-                        <p className="font-bold">{court.name}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-bold">{court.name}</p>
+                          <span
+                            className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${
+                              court.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : court.status === "maintenance"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {court.status}
+                          </span>
+                        </div>
                         <p className="mt-1 text-[var(--text-muted)]">
                           {court.indoor ? "Indoor" : "Outdoor"}{court.surfaceType ? ` · ${court.surfaceType}` : ""}
                         </p>
                         <p className="mt-3 font-bold text-[var(--forest)]">
                           ₱{(court.rateCents / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}/hour
                         </p>
+                        <details className="mt-4 border-t border-[var(--line)] pt-3">
+                          <summary className="cursor-pointer font-black text-[var(--forest)]">
+                            Edit court
+                          </summary>
+                          <form action={updateCourt} className="mt-4 space-y-4">
+                            <input name="courtId" type="hidden" value={court.id} />
+                            <label className="block text-xs font-bold">
+                              Court name
+                              <input
+                                name="name"
+                                required
+                                minLength={2}
+                                maxLength={120}
+                                defaultValue={court.name}
+                                className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                              />
+                            </label>
+                            <label className="block text-xs font-bold">
+                              Hourly rate (PHP)
+                              <input
+                                name="hourlyRate"
+                                type="number"
+                                required
+                                min="0"
+                                max="1000000"
+                                step="0.01"
+                                inputMode="decimal"
+                                defaultValue={(court.rateCents / 100).toFixed(2)}
+                                className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                              />
+                            </label>
+                            <label className="block text-xs font-bold">
+                              Surface type
+                              <input
+                                name="surfaceType"
+                                maxLength={100}
+                                defaultValue={court.surfaceType ?? ""}
+                                className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                              />
+                            </label>
+                            <label className="block text-xs font-bold">
+                              Availability status
+                              <select
+                                name="status"
+                                required
+                                defaultValue={court.status}
+                                className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 font-normal"
+                              >
+                                <option value="active">Active and publicly bookable</option>
+                                <option value="maintenance">Under maintenance</option>
+                                <option value="inactive">Inactive</option>
+                              </select>
+                            </label>
+                            <label className="flex items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2.5 text-xs font-semibold">
+                              <input name="indoor" type="checkbox" defaultChecked={court.indoor} />
+                              Indoor court
+                            </label>
+                            <button
+                              type="submit"
+                              className="w-full rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white"
+                            >
+                              Save court changes
+                            </button>
+                          </form>
+                        </details>
                       </div>
                     ))}
                   </div>
