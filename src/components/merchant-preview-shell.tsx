@@ -26,7 +26,7 @@ const groups = [
     label: "Finance",
     items: [
       { href: "/merchant/payments", label: "Payments", icon: "₱", permission: "verify_payments", disabled: true },
-      { href: "/merchant/reports", label: "Reports", icon: "↗", disabled: true },
+      { href: "/merchant/reports", label: "Reports", icon: "↗", permission: "view_dashboard" },
     ],
   },
   {
