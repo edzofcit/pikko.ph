@@ -1,10 +1,9 @@
 import { desc, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { getDb } from "@/db";
-import { bookings, courts, merchants, sites } from "@/db/schema";
-import { adminNavigation } from "@/lib/admin/navigation";
+import { bookings, courts, merchants, platformSettings, sites } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { formatPeso } from "@/lib/money";
 import {
@@ -33,9 +32,9 @@ export default async function AdminMerchantsPage({
 }: {
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
-  const [, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
+  const [admin, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
   const db = getDb();
-  const merchantRows = await db
+  const [merchantRows, defaultRows] = await Promise.all([db
     .select({
       id: merchants.id,
       displayName: merchants.displayName,
@@ -52,19 +51,19 @@ export default async function AdminMerchantsPage({
       bookingCount: sql<number>`(select count(*)::int from ${bookings} where ${bookings.merchantId} = ${merchants.id})`.mapWith(Number),
     })
     .from(merchants)
-    .orderBy(desc(merchants.createdAt));
+    .orderBy(desc(merchants.createdAt)), db.select().from(platformSettings).limit(1)]);
+  const defaults = defaultRows[0];
 
   return (
-    <DashboardShell
+    <AdminShell admin={admin} activeHref="/admin/merchants"
       eyebrow="Platform administration"
       title="Merchant management"
       description="Onboard operators, review their sites and courts, and configure subscription and gateway rates."
-      navigation={adminNavigation}
       metrics={[
         { label: "Merchants", value: String(merchantRows.length), note: "All tenant accounts" },
         { label: "Trialing", value: String(merchantRows.filter((row) => row.subscriptionStatus === "trialing").length), note: "14-day trial" },
         { label: "Paid", value: String(merchantRows.filter((row) => row.subscriptionStatus === "active").length), note: "Active subscriptions" },
-        { label: "Default rate", value: formatPeso(59900), note: "Per active court / month" },
+        { label: "Default rate", value: formatPeso(defaults?.defaultMonthlyCourtPriceCents ?? 59900), note: "Per active court / month" },
       ]}
     >
       {query.success || query.error ? (
@@ -119,6 +118,6 @@ export default async function AdminMerchantsPage({
           </article>
         ))}
       </section>
-    </DashboardShell>
+    </AdminShell>
   );
 }

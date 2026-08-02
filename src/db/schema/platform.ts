@@ -53,6 +53,30 @@ export const merchantSubscriptions = pgTable(
   ],
 );
 
+export const platformSettings = pgTable(
+  "platform_settings",
+  {
+    key: varchar("key", { length: 64 }).primaryKey().default("default"),
+    defaultMonthlyCourtPriceCents: integer("default_monthly_court_price_cents")
+      .default(59900)
+      .notNull(),
+    defaultGatewayFeeBasisPoints: integer("default_gateway_fee_basis_points")
+      .default(0)
+      .notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    check(
+      "platform_settings_monthly_price_nonnegative",
+      sql`${table.defaultMonthlyCourtPriceCents} >= 0`,
+    ),
+    check(
+      "platform_settings_gateway_fee_range",
+      sql`${table.defaultGatewayFeeBasisPoints} between 0 and 10000`,
+    ),
+  ],
+);
+
 export const courtSubscriptionUsage = pgTable(
   "court_subscription_usage",
   {

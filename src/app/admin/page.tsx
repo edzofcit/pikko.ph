@@ -1,255 +1,39 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { getDb } from "@/db";
-import {
-  bookings,
-  courts,
-  manualPaymentProofs,
-  merchants,
-  sites,
-} from "@/db/schema";
+import { bookings, courts, merchants, sites } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/access";
-import { adminNavigation } from "@/lib/admin/navigation";
 import { formatPeso } from "@/lib/money";
-import { updateMerchantCommercialSettings } from "./actions";
 
-export const metadata: Metadata = { title: "Platform administration" };
+export const metadata: Metadata = { title: "Platform overview" };
 export const dynamic = "force-dynamic";
 
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("en-PH", {
-    timeZone: "Asia/Manila",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
+function localDate(value: Date) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(value); }
+function atManilaMidnight(value: string) { return new Date(`${value}T00:00:00+08:00`); }
+function addDays(value: Date, days: number) { return new Date(value.getTime() + days * 86_400_000); }
+function dateRange(query: { period?: string; from?: string; to?: string }) {
+  const today = atManilaMidnight(localDate(new Date())); const period = new Set(["today", "week", "month", "custom"]).has(query.period ?? "") ? query.period! : "month";
+  if (period === "today") return { period, start: today, end: addDays(today, 1), label: "Today" };
+  if (period === "week") { const weekday = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short" }).format(today) === "Sun" ? 0 : new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short" }).format(today) === "Mon" ? 1 : new Date(`${localDate(today)}T12:00:00+08:00`).getDay()); const start = addDays(today, weekday === 0 ? -6 : 1 - weekday); return { period, start, end: addDays(start, 7), label: "This week" }; }
+  if (period === "custom" && /^\d{4}-\d{2}-\d{2}$/.test(query.from ?? "") && /^\d{4}-\d{2}-\d{2}$/.test(query.to ?? "")) { const start = atManilaMidnight(query.from!); const end = addDays(atManilaMidnight(query.to!), 1); if (start < end && end.getTime() - start.getTime() <= 366 * 86_400_000) return { period, start, end, label: `${query.from} to ${query.to}` }; }
+  const parts = localDate(today).split("-"); const start = atManilaMidnight(`${parts[0]}-${parts[1]}-01`); const end = atManilaMidnight(localDate(new Date(Date.UTC(Number(parts[0]), Number(parts[1]), 1)))); return { period: "month", start, end, label: "This month" };
 }
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ success?: string; error?: string }>;
-}) {
-  const [user, query] = await Promise.all([
-    requirePlatformAdmin(),
-    searchParams,
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ period?: string; from?: string; to?: string }> }) {
+  const [admin, query] = await Promise.all([requirePlatformAdmin(), searchParams]); const range = dateRange(query); const db = getDb(); const within = <T,>(column: T) => and(gte(column as never, range.start), lt(column as never, range.end));
+  const [merchantCount, siteCount, courtCount, customerCount, bookingCount, recent] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int`.mapWith(Number) }).from(merchants).where(within(merchants.createdAt)),
+    db.select({ count: sql<number>`count(*)::int`.mapWith(Number) }).from(sites).where(within(sites.createdAt)),
+    db.select({ count: sql<number>`count(*)::int`.mapWith(Number) }).from(courts).where(within(courts.createdAt)),
+    db.select({ count: sql<number>`count(distinct coalesce(lower(${bookings.customerEmail}), ${bookings.customerId}::text, ${bookings.customerMobileNumber}, ${bookings.id}::text))::int`.mapWith(Number) }).from(bookings).where(within(bookings.createdAt)),
+    db.select({ count: sql<number>`count(*)::int`.mapWith(Number), total: sql<number>`coalesce(sum(case when ${bookings.paymentStatus} = 'paid' then ${bookings.totalCents} else 0 end),0)::bigint`.mapWith(Number) }).from(bookings).where(within(bookings.createdAt)),
+    db.select({ id: bookings.id, reference: bookings.reference, customerName: bookings.customerName, status: bookings.status, paymentStatus: bookings.paymentStatus, totalCents: bookings.totalCents, createdAt: bookings.createdAt, merchantName: merchants.displayName, siteName: sites.name }).from(bookings).innerJoin(merchants, eq(merchants.id, bookings.merchantId)).innerJoin(sites, eq(sites.id, bookings.siteId)).where(within(bookings.createdAt)).orderBy(desc(bookings.createdAt)).limit(12),
   ]);
-  const db = getDb();
-  const [merchantRows, recentBookings] = await Promise.all([
-    db
-      .select({
-        id: merchants.id,
-        displayName: merchants.displayName,
-        slug: merchants.slug,
-        contactEmail: merchants.contactEmail,
-        status: merchants.status,
-        subscriptionStatus: merchants.subscriptionStatus,
-        monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
-        gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
-        createdAt: merchants.createdAt,
-        siteCount: sql<number>`(
-          select count(*)::int from ${sites}
-          where ${sites.merchantId} = ${merchants.id}
-        )`.mapWith(Number),
-        courtCount: sql<number>`(
-          select count(*)::int from ${courts}
-          where ${courts.merchantId} = ${merchants.id}
-        )`.mapWith(Number),
-        bookingCount: sql<number>`(
-          select count(*)::int from ${bookings}
-          where ${bookings.merchantId} = ${merchants.id}
-        )`.mapWith(Number),
-        collectedCents: sql<number>`coalesce((
-          select sum(${bookings.totalCents})::bigint from ${bookings}
-          where ${bookings.merchantId} = ${merchants.id}
-            and ${bookings.paymentStatus} = 'paid'
-        ), 0)`.mapWith(Number),
-        pendingProofCount: sql<number>`(
-          select count(*)::int from ${manualPaymentProofs}
-          where ${manualPaymentProofs.merchantId} = ${merchants.id}
-            and ${manualPaymentProofs.status} = 'submitted'
-        )`.mapWith(Number),
-      })
-      .from(merchants)
-      .orderBy(desc(merchants.createdAt)),
-    db
-      .select({
-        id: bookings.id,
-        reference: bookings.reference,
-        customerName: bookings.customerName,
-        status: bookings.status,
-        paymentStatus: bookings.paymentStatus,
-        totalCents: bookings.totalCents,
-        createdAt: bookings.createdAt,
-        merchantName: merchants.displayName,
-        siteName: sites.name,
-      })
-      .from(bookings)
-      .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
-      .innerJoin(sites, eq(sites.id, bookings.siteId))
-      .orderBy(desc(bookings.createdAt))
-      .limit(12),
-  ]);
-
-  const activeMerchants = merchantRows.filter(
-    (merchant) => merchant.status === "active",
-  ).length;
-  const billableCourts = merchantRows
-    .filter((merchant) => merchant.subscriptionStatus !== "cancelled")
-    .reduce((total, merchant) => total + merchant.courtCount, 0);
-  const collectedCents = merchantRows.reduce(
-    (total, merchant) => total + merchant.collectedCents,
-    0,
-  );
-  const pendingProofs = merchantRows.reduce(
-    (total, merchant) => total + merchant.pendingProofCount,
-    0,
-  );
-
-  return (
-    <DashboardShell
-      eyebrow="Pikko.ph platform administration"
-      title={`Marketplace overview, ${user.fullName}.`}
-      description="Live platform operations across merchants, subscriptions, courts, bookings, payment verification, and configurable commercial terms."
-      navigation={adminNavigation}
-      metrics={[
-        { label: "Active merchants", value: String(activeMerchants), note: `${merchantRows.length} total merchant accounts` },
-        { label: "Billable courts", value: String(billableCourts), note: "Excludes cancelled subscriptions" },
-        { label: "Collected booking value", value: formatPeso(collectedCents), note: "All paid bookings" },
-        { label: "Payment proofs", value: String(pendingProofs), note: "Awaiting merchant verification" },
-      ]}
-    >
-      {query.success || query.error ? (
-        <p
-          role={query.error ? "alert" : "status"}
-          className={`mt-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${
-            query.error
-              ? "border-red-200 bg-red-50 text-red-800"
-              : "border-green-200 bg-green-50 text-green-800"
-          }`}
-        >
-          {query.error ?? query.success}
-        </p>
-      ) : null}
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-[var(--line)] bg-white">
-        <div className="border-b border-[var(--line)] px-5 py-4">
-          <h2 className="font-bold">Merchant accounts</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Configure access status, subscription state, monthly court price, and gateway percentage per merchant.
-          </p>
-        </div>
-        <div className="divide-y divide-[var(--line)]">
-          {merchantRows.map((merchant) => (
-            <article key={merchant.id} className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-black">{merchant.displayName}</h3>
-                    <span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-xs font-black uppercase text-[var(--forest)]">
-                      {merchant.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    {merchant.contactEmail ?? `/${merchant.slug}`} · Joined {formatDateTime(merchant.createdAt)}
-                  </p>
-                </div>
-                <Link
-                  href={`/${merchant.slug}`}
-                  className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-black text-[var(--forest)]"
-                >
-                  View public page
-                </Link>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {[
-                  ["Sites", String(merchant.siteCount)],
-                  ["Courts", String(merchant.courtCount)],
-                  ["Bookings", String(merchant.bookingCount)],
-                  ["Collected", formatPeso(merchant.collectedCents)],
-                  ["Proofs pending", String(merchant.pendingProofCount)],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-[var(--paper)] p-3">
-                    <p className="text-xs text-[var(--text-muted)]">{label}</p>
-                    <p className="mt-1 font-black">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <form
-                action={updateMerchantCommercialSettings}
-                className="mt-5 grid gap-4 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end"
-              >
-                <input type="hidden" name="merchantId" value={merchant.id} />
-                <label className="text-xs font-bold">
-                  Merchant status
-                  <select name="status" defaultValue={merchant.status} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal">
-                    <option value="onboarding">Onboarding</option>
-                    <option value="active">Active</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </label>
-                <label className="text-xs font-bold">
-                  Subscription
-                  <select name="subscriptionStatus" defaultValue={merchant.subscriptionStatus} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal">
-                    <option value="trialing">Trialing</option>
-                    <option value="active">Active</option>
-                    <option value="past_due">Past due</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </label>
-                <label className="text-xs font-bold">
-                  Per court / month (PHP)
-                  <input name="monthlyCourtPrice" type="number" min="0" max="1000000" step="0.01" defaultValue={(merchant.monthlyCourtPriceCents / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" />
-                </label>
-                <label className="text-xs font-bold">
-                  Gateway fee (%)
-                  <input name="gatewayFeePercentage" type="number" min="0" max="100" step="0.01" defaultValue={(merchant.gatewayFeeBasisPoints / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" />
-                </label>
-                <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
-                  Save settings
-                </button>
-              </form>
-              <p className="mt-3 text-right text-xs text-[var(--text-muted)]">
-                Estimated court subscription: {formatPeso(merchant.courtCount * merchant.monthlyCourtPriceCents)}/month
-              </p>
-            </article>
-          ))}
-          {!merchantRows.length ? (
-            <p className="px-5 py-12 text-center text-sm text-[var(--text-muted)]">
-              No merchant accounts have been created yet.
-            </p>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-[var(--line)] bg-white">
-        <div className="border-b border-[var(--line)] px-5 py-4">
-          <h2 className="font-bold">Recent platform bookings</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Latest activity across every merchant and site</p>
-        </div>
-        <div className="divide-y divide-[var(--line)]">
-          {recentBookings.map((booking) => (
-            <div key={booking.id} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[0.8fr_1.2fr_1fr_1fr_0.7fr] sm:items-center">
-              <span className="font-mono text-xs font-black">{booking.reference}</span>
-              <span className="font-bold">{booking.merchantName} · {booking.siteName}</span>
-              <span className="text-[var(--text-muted)]">{booking.customerName ?? "Guest"}</span>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-[var(--mint)] px-2.5 py-1 text-xs font-black">{booking.status.replaceAll("_", " ")}</span>
-                <span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-xs font-black">{booking.paymentStatus.replaceAll("_", " ")}</span>
-              </div>
-              <span className="font-black sm:text-right">{formatPeso(booking.totalCents)}</span>
-            </div>
-          ))}
-          {!recentBookings.length ? (
-            <p className="px-5 py-12 text-center text-sm text-[var(--text-muted)]">No bookings yet.</p>
-          ) : null}
-        </div>
-      </section>
-    </DashboardShell>
-  );
+  return <AdminShell admin={admin} activeHref="/admin" title="Platform overview" description="Marketplace activity across merchants, venues, courts, customers, and bookings." metrics={[
+    { label: "Merchants", value: String(merchantCount[0]?.count ?? 0), note: `Created · ${range.label}` }, { label: "Sites", value: String(siteCount[0]?.count ?? 0), note: `Created · ${range.label}` }, { label: "Courts", value: String(courtCount[0]?.count ?? 0), note: `Created · ${range.label}` }, { label: "Customers", value: String(customerCount[0]?.count ?? 0), note: `Booked · ${range.label}` }, { label: "Bookings", value: String(bookingCount[0]?.count ?? 0), note: `${formatPeso(bookingCount[0]?.total ?? 0)} paid value` },
+  ]}>
+    <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4"><form className="grid gap-3 sm:grid-cols-[12rem_1fr_1fr_auto] sm:items-end"><label className="text-xs font-black">Period<select name="period" defaultValue={range.period} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 font-normal"><option value="today">Daily / today</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="custom">Specific range</option></select></label><label className="text-xs font-black">From<input name="from" type="date" defaultValue={query.from ?? localDate(range.start)} className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal" /></label><label className="text-xs font-black">To<input name="to" type="date" defaultValue={query.to ?? localDate(addDays(range.end, -1))} className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="rounded-full bg-[var(--forest)] px-5 py-3 text-xs font-black text-white">Apply filter</button></form></section>
+    <section className="mt-6 overflow-hidden rounded-2xl border border-[var(--line)] bg-white"><header className="border-b border-[var(--line)] px-5 py-4"><h2 className="font-black">Recent bookings</h2><p className="mt-1 text-xs text-[var(--text-muted)]">{range.label}</p></header><div className="divide-y divide-[var(--line)]">{recent.map((booking) => <article key={booking.id} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[0.7fr_1.3fr_1fr_1fr_0.6fr] sm:items-center"><span className="font-mono text-xs font-black">{booking.reference}</span><span className="font-bold">{booking.merchantName} · {booking.siteName}</span><span>{booking.customerName || "Guest"}</span><span className="text-xs capitalize">{booking.status.replaceAll("_", " ")} · {booking.paymentStatus.replaceAll("_", " ")}</span><span className="font-black sm:text-right">{formatPeso(booking.totalCents)}</span></article>)}{!recent.length ? <p className="p-12 text-center text-sm text-[var(--text-muted)]">No bookings in this period.</p> : null}</div></section>
+  </AdminShell>;
 }

@@ -1,9 +1,8 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { getDb } from "@/db";
 import { merchants, subscriptionInvoices } from "@/db/schema";
-import { adminNavigation } from "@/lib/admin/navigation";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { formatPeso } from "@/lib/money";
 import { updateInvoiceStatus } from "../actions";
@@ -27,7 +26,7 @@ export default async function AdminInvoicesPage({
 }: {
   searchParams: Promise<{ status?: string; success?: string; error?: string }>;
 }) {
-  const [, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
+  const [admin, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
   const selectedStatus = FILTER_STATUSES.has(query.status ?? "") ? query.status! : "";
   const db = getDb();
   const invoices = await db
@@ -59,11 +58,10 @@ export default async function AdminInvoicesPage({
   const outstandingCents = invoices.filter((invoice) => invoice.status === "issued" || invoice.status === "past_due").reduce((total, invoice) => total + invoice.totalCents, 0);
 
   return (
-    <DashboardShell
+    <AdminShell admin={admin} activeHref="/admin/invoices"
       eyebrow="Platform administration"
       title="Subscription invoices"
       description="Invoices are generated after the 14-day trial and at the start of each monthly paid-subscription period."
-      navigation={adminNavigation}
       metrics={[
         { label: "Invoices", value: String(invoices.length), note: selectedStatus || "All statuses" },
         { label: "Outstanding", value: formatPeso(outstandingCents), note: "Issued and past due" },
@@ -103,6 +101,6 @@ export default async function AdminInvoicesPage({
           {!invoices.length ? <p className="px-6 py-14 text-center text-sm text-[var(--text-muted)]">No invoices match this view. Trial merchants are invoiced when their trial ends or when set to paid.</p> : null}
         </div>
       </section>
-    </DashboardShell>
+    </AdminShell>
   );
 }

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { requirePlatformAdmin } from "@/lib/auth/access";
-import { adminNavigation } from "@/lib/admin/navigation";
 import { sendAdminTestEmail } from "./actions";
 
 export const metadata: Metadata = { title: "Email diagnostics" };
@@ -35,11 +34,10 @@ export default async function AdminEmailTestPage({
   const feedbackMessage = feedback[feedbackKey];
 
   return (
-    <DashboardShell
+    <AdminShell admin={admin} activeHref="/admin/email-test"
       eyebrow="Platform administration · Email diagnostics"
       title="Test the server-side mailer."
       description="Run controlled Resend checks without exposing the API key or allowing arbitrary recipients."
-      navigation={adminNavigation}
       metrics={[
         { label: "Provider", value: "Resend", note: "Vercel Marketplace integration" },
         { label: "Runtime", value: "Server", note: "API key is never sent to the browser" },
@@ -106,6 +104,6 @@ export default async function AdminEmailTestPage({
           ← Back to platform administration
         </Link>
       </section>
-    </DashboardShell>
+    </AdminShell>
   );
 }

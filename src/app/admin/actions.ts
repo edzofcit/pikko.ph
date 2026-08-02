@@ -1,21 +1,25 @@
 "use server";
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Resend } from "resend";
 import { getDb } from "@/db";
 import {
   auditEvents,
+  courts,
   merchantMemberships,
   merchants,
+  platformSettings,
+  sites,
   subscriptionInvoices,
   users,
 } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { processSubscriptionBilling } from "@/lib/billing/subscriptions";
 import { pikkoEmailSender } from "@/lib/email/sender";
+import { normalizeManualPaymentOptions } from "@/lib/manual-payment/options";
 import { toPublicMerchantSlug } from "@/lib/slug";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,6 +43,28 @@ function adminUrl(kind: "success" | "error", message: string) {
 
 function merchantAdminUrl(kind: "success" | "error", message: string) {
   return `/admin/merchants?${kind}=${encodeURIComponent(message)}`;
+}
+
+function settingsAdminUrl(kind: "success" | "error", message: string) {
+  return `/admin/settings?${kind}=${encodeURIComponent(message)}`;
+}
+
+function merchantDetailUrl(merchantId: string, kind: "success" | "error", message: string) {
+  return `/admin/merchants/${merchantId}?${kind}=${encodeURIComponent(message)}`;
+}
+
+function optionalText(value: FormDataEntryValue | null, maximum: number) {
+  const text = String(value ?? "").trim();
+  return text.length <= maximum ? text || null : undefined;
+}
+
+function commaList(value: FormDataEntryValue | null) {
+  return Array.from(new Set(String(value ?? "").split(",").map((item) => item.trim()).filter(Boolean))).slice(0, 40);
+}
+
+function coordinate(value: FormDataEntryValue | null, minimum: number, maximum: number) {
+  const text = String(value ?? "").trim(); if (!text) return null; const number = Number(text);
+  return Number.isFinite(number) && number >= minimum && number <= maximum ? number.toFixed(6) : undefined;
 }
 
 function escapeHtml(value: string) {
@@ -186,6 +212,10 @@ export async function manuallyOnboardMerchant(formData: FormData) {
   }
 
   const db = getDb();
+  await db.insert(platformSettings).values({ key: "default" }).onConflictDoNothing();
+  const [defaults] = await db.select().from(platformSettings).where(eq(platformSettings.key, "default")).limit(1);
+  const defaultMonthlyCourtPriceCents = defaults?.defaultMonthlyCourtPriceCents ?? 59900;
+  const defaultGatewayFeeBasisPoints = defaults?.defaultGatewayFeeBasisPoints ?? 0;
   const [existingUser] = await db
     .select({ id: users.id })
     .from(users)
@@ -260,7 +290,8 @@ export async function manuallyOnboardMerchant(formData: FormData) {
       contactPhone: contactPhone || null,
       subscriptionStatus: "trialing",
       trialEndsAt,
-      monthlyCourtPriceCents: 59900,
+      monthlyCourtPriceCents: defaultMonthlyCourtPriceCents,
+      gatewayFeeBasisPoints: defaultGatewayFeeBasisPoints,
     }),
     db.insert(merchantMemberships).values({
       id: membershipId,
@@ -283,7 +314,8 @@ export async function manuallyOnboardMerchant(formData: FormData) {
         ownerEmail,
         subscriptionStatus: "trialing",
         trialEndsAt,
-        monthlyCourtPriceCents: 59900,
+        monthlyCourtPriceCents: defaultMonthlyCourtPriceCents,
+        gatewayFeeBasisPoints: defaultGatewayFeeBasisPoints,
       },
     }),
   ]);
@@ -308,9 +340,9 @@ export async function manuallyOnboardMerchant(formData: FormData) {
           `Change password: ${securityUrl}`,
           "",
           "For security, change this temporary password after your first sign-in and do not share it.",
-          "After the trial, billing starts at PHP 599 per active court per month unless your platform rate is changed.",
+          `After the trial, billing starts at PHP ${(defaultMonthlyCourtPriceCents / 100).toLocaleString("en-PH")} per active court per month unless your platform rate is changed.`,
         ].join("\n"),
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#173d32"><h1>Welcome to Pikko.ph</h1><p>Hi ${escapeHtml(ownerName)},</p><p><strong>${escapeHtml(displayName)}</strong> is ready with a 14-day trial.</p><div style="padding:18px;border-radius:14px;background:#f7f5eb"><p><strong>Login:</strong> ${escapeHtml(ownerEmail)}</p><p><strong>Temporary password:</strong> <code>${escapeHtml(temporaryPassword)}</code></p></div><p><a href="${escapeHtml(signInUrl)}">Sign in to your merchant dashboard</a></p><p>For security, <a href="${escapeHtml(securityUrl)}">change the temporary password</a> after your first sign-in. Billing begins after the trial at PHP 599 per active court per month unless your platform rate is changed.</p></div>`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#173d32"><h1>Welcome to Pikko.ph</h1><p>Hi ${escapeHtml(ownerName)},</p><p><strong>${escapeHtml(displayName)}</strong> is ready with a 14-day trial.</p><div style="padding:18px;border-radius:14px;background:#f7f5eb"><p><strong>Login:</strong> ${escapeHtml(ownerEmail)}</p><p><strong>Temporary password:</strong> <code>${escapeHtml(temporaryPassword)}</code></p></div><p><a href="${escapeHtml(signInUrl)}">Sign in to your merchant dashboard</a></p><p>For security, <a href="${escapeHtml(securityUrl)}">change the temporary password</a> after your first sign-in. Billing begins after the trial at PHP ${(defaultMonthlyCourtPriceCents / 100).toLocaleString("en-PH")} per active court per month unless your platform rate is changed.</p></div>`,
       },
       { idempotencyKey: `merchant-onboarding-${merchantId}` },
     );
@@ -330,6 +362,64 @@ export async function manuallyOnboardMerchant(formData: FormData) {
         : `${displayName} was created, but the temporary-access email failed. Contact support before retrying.`,
     ),
   );
+}
+
+export async function updatePlatformSettings(formData: FormData) {
+  const admin = await requirePlatformAdmin();
+  const defaultMonthlyCourtPriceCents = pesoToCents(formData.get("defaultMonthlyCourtPrice"));
+  const defaultGatewayFeeBasisPoints = percentToBasisPoints(formData.get("defaultGatewayFeePercentage"));
+  if (defaultMonthlyCourtPriceCents === null || defaultGatewayFeeBasisPoints === null) {
+    redirect(settingsAdminUrl("error", "Check the default subscription and gateway fee values."));
+  }
+  const db = getDb();
+  await db.insert(platformSettings).values({ key: "default" }).onConflictDoNothing();
+  const [before] = await db.select().from(platformSettings).where(eq(platformSettings.key, "default")).limit(1);
+  const after = { defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints };
+  await db.batch([
+    db.update(platformSettings).set({ ...after, updatedAt: new Date() }).where(eq(platformSettings.key, "default")),
+    db.insert(auditEvents).values({
+      actorUserId: admin.id,
+      action: "platform.settings.updated",
+      targetType: "platform_settings",
+      before: before ? { defaultMonthlyCourtPriceCents: before.defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints: before.defaultGatewayFeeBasisPoints } : null,
+      after,
+    }),
+  ]);
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/merchants");
+  redirect(settingsAdminUrl("success", "Platform defaults updated."));
+}
+
+export async function updateMerchantProfile(formData: FormData) {
+  const admin = await requirePlatformAdmin(); const merchantId = String(formData.get("merchantId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim(); const legalName = optionalText(formData.get("legalName"), 200); const description = optionalText(formData.get("description"), 5000); const contactEmail = optionalText(formData.get("contactEmail"), 320); const contactPhone = optionalText(formData.get("contactPhone"), 40); const defaultTimezone = String(formData.get("defaultTimezone") ?? "").trim();
+  if (!UUID_PATTERN.test(merchantId) || displayName.length < 2 || displayName.length > 160 || legalName === undefined || description === undefined || contactEmail === undefined || contactPhone === undefined || !defaultTimezone || defaultTimezone.length > 64) redirect(merchantDetailUrl(merchantId, "error", "Check the merchant profile values."));
+  const db = getDb(); const [before] = await db.select().from(merchants).where(eq(merchants.id, merchantId)).limit(1); if (!before) redirect("/admin/merchants?error=Merchant%20not%20found.");
+  const after = { displayName, legalName, description, contactEmail, contactPhone, defaultTimezone };
+  await db.batch([db.update(merchants).set({ ...after, updatedAt: new Date() }).where(eq(merchants.id, merchantId)), db.insert(auditEvents).values({ merchantId, actorUserId: admin.id, action: "platform.merchant.profile_overridden", targetType: "merchant", targetId: merchantId, before: { displayName: before.displayName, legalName: before.legalName, description: before.description, contactEmail: before.contactEmail, contactPhone: before.contactPhone, defaultTimezone: before.defaultTimezone }, after })]);
+  revalidatePath(`/admin/merchants/${merchantId}`); revalidatePath(`/${before.slug}`); redirect(merchantDetailUrl(merchantId, "success", "Merchant profile updated."));
+}
+
+export async function updateSiteOverride(formData: FormData) {
+  const admin = await requirePlatformAdmin(); const merchantId = String(formData.get("merchantId") ?? ""); const siteId = String(formData.get("siteId") ?? ""); const name = String(formData.get("name") ?? "").trim(); const status = String(formData.get("status") ?? "");
+  const description = optionalText(formData.get("description"), 5000); const addressLine1 = String(formData.get("addressLine1") ?? "").trim(); const addressLine2 = optionalText(formData.get("addressLine2"), 200); const city = String(formData.get("city") ?? "").trim(); const province = optionalText(formData.get("province"), 100); const postalCode = optionalText(formData.get("postalCode"), 20); const timezone = String(formData.get("timezone") ?? "").trim(); const contactEmail = optionalText(formData.get("contactEmail"), 320); const contactPhone = optionalText(formData.get("contactPhone"), 40); const latitude = coordinate(formData.get("latitude"), -90, 90); const longitude = coordinate(formData.get("longitude"), -180, 180); const bookingLeadMinutes = Number(formData.get("bookingLeadMinutes")); const advanceBookingDays = Number(formData.get("advanceBookingDays")); const manualPaymentDeadlineMinutes = Number(formData.get("manualPaymentDeadlineMinutes")); const taxRate = percentToBasisPoints(formData.get("taxPercentage"));
+  if (!UUID_PATTERN.test(merchantId) || !UUID_PATTERN.test(siteId) || name.length < 2 || name.length > 160 || !new Set(["draft", "active", "inactive"]).has(status) || description === undefined || !addressLine1 || addressLine1.length > 200 || addressLine2 === undefined || !city || city.length > 100 || province === undefined || postalCode === undefined || !timezone || timezone.length > 64 || contactEmail === undefined || contactPhone === undefined || latitude === undefined || longitude === undefined || (latitude === null) !== (longitude === null) || !Number.isInteger(bookingLeadMinutes) || bookingLeadMinutes < 0 || !Number.isInteger(advanceBookingDays) || advanceBookingDays < 1 || !Number.isInteger(manualPaymentDeadlineMinutes) || manualPaymentDeadlineMinutes < 1 || taxRate === null) redirect(merchantDetailUrl(merchantId, "error", "Check the site configuration values."));
+  const db = getDb(); const [before] = await db.select().from(sites).where(and(eq(sites.id, siteId), eq(sites.merchantId, merchantId))).limit(1); if (!before) redirect(merchantDetailUrl(merchantId, "error", "Site not found."));
+  const manualPaymentInstructions = optionalText(formData.get("manualPaymentInstructions"), 5000); if (manualPaymentInstructions === undefined) redirect(merchantDetailUrl(merchantId, "error", "Manual payment instructions are too long."));
+  const enabledProviders = new Set(formData.getAll("manualPaymentProviders").map(String));
+  const manualPaymentOptions = normalizeManualPaymentOptions(before.manualPaymentOptions).map((option) => ({ ...option, enabled: enabledProviders.has(option.provider) }));
+  const after = { name, status: status as typeof before.status, description, addressLine1, addressLine2, city, province, postalCode, timezone, contactEmail, contactPhone, latitude, longitude, amenities: commaList(formData.get("amenities")), bookingLeadMinutes, advanceBookingDays, onlinePaymentEnabled: formData.get("onlinePaymentEnabled") === "on", manualPaymentEnabled: formData.get("manualPaymentEnabled") === "on", manualPaymentDeadlineMinutes, manualPaymentInstructions, manualPaymentOptions, taxInclusive: formData.get("taxInclusive") === "on", taxBasisPoints: taxRate };
+  await db.batch([db.update(sites).set({ ...after, updatedAt: new Date() }).where(and(eq(sites.id, siteId), eq(sites.merchantId, merchantId))), db.insert(auditEvents).values({ merchantId, actorUserId: admin.id, action: "platform.site.overridden", targetType: "site", targetId: siteId, before: { name: before.name, status: before.status, latitude: before.latitude, longitude: before.longitude, onlinePaymentEnabled: before.onlinePaymentEnabled, manualPaymentEnabled: before.manualPaymentEnabled }, after })]);
+  revalidatePath(`/admin/merchants/${merchantId}`); revalidatePath(`/${(await db.select({ slug: merchants.slug }).from(merchants).where(eq(merchants.id, merchantId)).limit(1))[0]?.slug}/${before.slug}`); redirect(merchantDetailUrl(merchantId, "success", `${name} updated.`));
+}
+
+export async function updateCourtOverride(formData: FormData) {
+  const admin = await requirePlatformAdmin(); const merchantId = String(formData.get("merchantId") ?? ""); const courtId = String(formData.get("courtId") ?? ""); const name = String(formData.get("name") ?? "").trim(); const status = String(formData.get("status") ?? ""); const description = optionalText(formData.get("description"), 5000); const surfaceType = optionalText(formData.get("surfaceType"), 100); const baseHourlyRateCents = pesoToCents(formData.get("baseHourlyRate")); const sortOrder = Number(formData.get("sortOrder"));
+  if (!UUID_PATTERN.test(merchantId) || !UUID_PATTERN.test(courtId) || name.length < 1 || name.length > 120 || !new Set(["active", "inactive", "maintenance"]).has(status) || description === undefined || surfaceType === undefined || baseHourlyRateCents === null || !Number.isInteger(sortOrder) || sortOrder < 0) redirect(merchantDetailUrl(merchantId, "error", "Check the court configuration values."));
+  const db = getDb(); const [before] = await db.select().from(courts).where(and(eq(courts.id, courtId), eq(courts.merchantId, merchantId))).limit(1); if (!before) redirect(merchantDetailUrl(merchantId, "error", "Court not found."));
+  const after = { name, status: status as typeof before.status, description, surfaceType, baseHourlyRateCents, indoor: formData.get("indoor") === "on", amenities: commaList(formData.get("amenities")), sortOrder };
+  await db.batch([db.update(courts).set({ ...after, updatedAt: new Date() }).where(and(eq(courts.id, courtId), eq(courts.merchantId, merchantId))), db.insert(auditEvents).values({ merchantId, actorUserId: admin.id, action: "platform.court.overridden", targetType: "court", targetId: courtId, before: { name: before.name, status: before.status, baseHourlyRateCents: before.baseHourlyRateCents }, after })]);
+  revalidatePath(`/admin/merchants/${merchantId}`); redirect(merchantDetailUrl(merchantId, "success", `${name} updated.`));
 }
 
 export async function updateInvoiceStatus(formData: FormData) {

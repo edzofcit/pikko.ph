@@ -19,7 +19,7 @@ const groups = [
       { href: "/merchant/bookings/new", label: "Walk-ins", icon: "+", permission: "manage_bookings" },
       { href: "/merchant/blocks", label: "Blocks & maintenance", icon: "⊘", permission: "manage_courts" },
       { href: "/merchant/sites", label: "Sites & courts", icon: "▦", permission: "manage_courts" },
-      { href: "/merchant/customers", label: "Customers", icon: "♙", permission: "manage_bookings", disabled: true },
+      { href: "/merchant/customers", label: "Customers", icon: "♙", permission: "manage_bookings" },
     ],
   },
   {
