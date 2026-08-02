@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -33,7 +33,7 @@ export default async function PublicMerchantPage({
       city: sites.city,
       province: sites.province,
       courtId: courts.id,
-      coverUrl: sitePhotos.url,
+      coverUrl: sql<string | null>`case when ${sitePhotos.id} is null then null else '/api/venue-photos/site/' || ${sitePhotos.id}::text end`,
     })
     .from(sites)
     .leftJoin(courts, and(eq(courts.siteId, sites.id), eq(courts.status, "active")))

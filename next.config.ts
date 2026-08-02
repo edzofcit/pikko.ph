@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
       {
         pathname: "/api/sites/*/payment-qr/*",
       },
+      {
+        pathname: "/api/venue-photos/*/*",
+      },
     ],
     remotePatterns: [
       {

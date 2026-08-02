@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { sitePhotos } from "@/db/schema";
 import { getSiteAvailability } from "@/lib/booking/availability";
@@ -53,7 +53,7 @@ export default async function PublicSitePage({
   const availability = await getSiteAvailability(merchantSlug, siteSlug, query.date);
   if (!availability) notFound();
   const [coverPhoto] = await getDb()
-    .select({ url: sitePhotos.url, altText: sitePhotos.altText })
+    .select({ url: sql<string>`'/api/venue-photos/site/' || ${sitePhotos.id}::text`, altText: sitePhotos.altText })
     .from(sitePhotos)
     .where(and(eq(sitePhotos.siteId, availability.site.id), eq(sitePhotos.isCover, true)))
     .limit(1);

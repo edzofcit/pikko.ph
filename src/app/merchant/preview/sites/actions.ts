@@ -1,8 +1,8 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { del, put } from "@vercel/blob";
-import { and, asc, eq, max, sql } from "drizzle-orm";
+import { del } from "@vercel/blob";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
@@ -21,8 +21,6 @@ import { toSlug } from "@/lib/slug";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function previewUrl(siteId: string, tab: string, message: string, error = false) {
   const params = new URLSearchParams({ site: siteId, tab, [error ? "error" : "success"]: message });
@@ -243,38 +241,6 @@ export async function updateSiteBookingSettings(formData: FormData) {
   await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.booking_settings_updated", targetType: "site", targetId: siteId, after: { bookingLeadMinutes, advanceBookingDays, onlinePaymentEnabled, manualPaymentEnabled, manualReservationMode, manualPaymentDeadlineMinutes } });
   revalidatePath("/merchant/sites");
   redirect(previewUrl(siteId, "settings", "Booking and payment settings updated."));
-}
-
-export async function uploadVenuePhoto(formData: FormData) {
-  const siteId = String(formData.get("siteId") ?? "");
-  const courtId = String(formData.get("courtId") ?? "");
-  const file = formData.get("photo");
-  const altText = String(formData.get("altText") ?? "").trim();
-  const { access } = await requireOwnedSite("manage_courts", siteId);
-  const db = getDb();
-  if (!(file instanceof File) || !file.size || file.size > MAX_IMAGE_BYTES || !IMAGE_TYPES.has(file.type) || altText.length > 200 || !process.env.BLOB_READ_WRITE_TOKEN) redirect(previewUrl(siteId, "photos", "Upload a JPG, PNG, or WebP image up to 8 MB.", true));
-  if (courtId) {
-    const [court] = await db.select({ id: courts.id }).from(courts).where(and(eq(courts.id, courtId), eq(courts.siteId, siteId), eq(courts.merchantId, access.membership.merchantId))).limit(1);
-    if (!court) redirect(previewUrl(siteId, "photos", "Court not found.", true));
-  }
-  const table = courtId ? courtPhotos : sitePhotos;
-  const entityIdColumn = courtId ? courtPhotos.courtId : sitePhotos.siteId;
-  const entityId = courtId || siteId;
-  const [{ count, lastOrder }] = await db.select({ count: max(table.sortOrder), lastOrder: max(table.sortOrder) }).from(table).where(eq(entityIdColumn, entityId));
-  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const pathname = `merchant-media/${access.membership.merchantId}/${courtId ? `courts/${courtId}` : `sites/${siteId}`}/${randomUUID()}.${extension}`;
-  const uploaded = await put(pathname, file, { access: "public", addRandomSuffix: false, contentType: file.type });
-  try {
-    if (courtId) await db.insert(courtPhotos).values({ merchantId: access.membership.merchantId, courtId, url: uploaded.url, pathname: uploaded.pathname, altText: altText || null, isCover: count === null, sortOrder: (lastOrder ?? -1) + 1, createdByUserId: access.user.id });
-    else await db.insert(sitePhotos).values({ merchantId: access.membership.merchantId, siteId, url: uploaded.url, pathname: uploaded.pathname, altText: altText || null, isCover: count === null, sortOrder: (lastOrder ?? -1) + 1, createdByUserId: access.user.id });
-  } catch (error) {
-    await del(uploaded.pathname).catch(() => undefined);
-    console.error("Venue photo database insert failed", error);
-    redirect(previewUrl(siteId, "photos", "The photo could not be saved.", true));
-  }
-  await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "venue_photo.uploaded", targetType: courtId ? "court" : "site", targetId: entityId, after: { pathname: uploaded.pathname, altText } });
-  revalidatePath("/merchant/sites");
-  redirect(previewUrl(siteId, "photos", "Photo uploaded."));
 }
 
 export async function setVenueCoverPhoto(formData: FormData) {

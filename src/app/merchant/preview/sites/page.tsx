@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { MerchantPreviewShell } from "@/components/merchant-preview-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { SiteLocationPicker } from "@/components/site-location-picker";
+import { VenuePhotoUpload } from "@/components/venue-photo-upload";
 import { getDb } from "@/db";
 import {
   courtPhotos,
@@ -34,7 +35,6 @@ import {
   updateOperatingHours,
   updateSiteBookingSettings,
   updateSiteSettings,
-  uploadVenuePhoto,
 } from "./actions";
 
 export const metadata: Metadata = { title: "Sites and courts" };
@@ -75,7 +75,7 @@ export default async function MerchantSitesPreview({ searchParams }: { searchPar
   const visibleIds = siteRows.map((site) => site.id);
   const [courtRows, allSitePhotos] = visibleIds.length ? await Promise.all([
     db.select({ id: courts.id, siteId: courts.siteId, name: courts.name, description: courts.description, status: courts.status, indoor: courts.indoor, surfaceType: courts.surfaceType, rateCents: courts.baseHourlyRateCents }).from(courts).where(and(eq(courts.merchantId, access.membership.merchantId), inArray(courts.siteId, visibleIds))).orderBy(asc(courts.sortOrder), asc(courts.name)),
-    db.select({ id: sitePhotos.id, siteId: sitePhotos.siteId, url: sitePhotos.url, altText: sitePhotos.altText, isCover: sitePhotos.isCover }).from(sitePhotos).where(and(eq(sitePhotos.merchantId, access.membership.merchantId), inArray(sitePhotos.siteId, visibleIds))).orderBy(asc(sitePhotos.sortOrder)),
+    db.select({ id: sitePhotos.id, siteId: sitePhotos.siteId, url: sql<string>`'/api/venue-photos/site/' || ${sitePhotos.id}::text`, altText: sitePhotos.altText, isCover: sitePhotos.isCover }).from(sitePhotos).where(and(eq(sitePhotos.merchantId, access.membership.merchantId), inArray(sitePhotos.siteId, visibleIds))).orderBy(asc(sitePhotos.sortOrder)),
   ]) : [[], []];
   const searchedSites = siteRows.filter((site) => (!query.q || `${site.name} ${site.city} ${site.addressLine1}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.status || site.status === query.status));
   const selectedSiteId = siteRows.some((site) => site.id === query.site) ? query.site! : searchedSites[0]?.id ?? "";
@@ -86,8 +86,8 @@ export default async function MerchantSitesPreview({ searchParams }: { searchPar
   const [hours, rules, selectedSitePhotos, selectedCourtPhotos, staff, assignments] = selectedSite ? await Promise.all([
     db.select().from(siteOperatingHours).where(and(eq(siteOperatingHours.siteId, selectedSiteId), eq(siteOperatingHours.merchantId, access.membership.merchantId))).orderBy(asc(siteOperatingHours.dayOfWeek)),
     db.select({ id: priceRules.id, name: priceRules.name, courtId: priceRules.courtId, type: priceRules.type, dayOfWeek: priceRules.dayOfWeek, specialDate: priceRules.specialDate, startsAt: priceRules.startsAt, endsAt: priceRules.endsAt, hourlyRateCents: priceRules.hourlyRateCents, active: priceRules.active }).from(priceRules).where(and(eq(priceRules.siteId, selectedSiteId), eq(priceRules.merchantId, access.membership.merchantId))).orderBy(asc(priceRules.name)),
-    db.select({ id: sitePhotos.id, url: sitePhotos.url, altText: sitePhotos.altText, isCover: sitePhotos.isCover }).from(sitePhotos).where(eq(sitePhotos.siteId, selectedSiteId)).orderBy(asc(sitePhotos.sortOrder)),
-    selectedCourtIds.length ? db.select({ id: courtPhotos.id, courtId: courtPhotos.courtId, url: courtPhotos.url, altText: courtPhotos.altText, isCover: courtPhotos.isCover }).from(courtPhotos).where(inArray(courtPhotos.courtId, selectedCourtIds)).orderBy(asc(courtPhotos.sortOrder)) : [],
+    db.select({ id: sitePhotos.id, url: sql<string>`'/api/venue-photos/site/' || ${sitePhotos.id}::text`, altText: sitePhotos.altText, isCover: sitePhotos.isCover }).from(sitePhotos).where(eq(sitePhotos.siteId, selectedSiteId)).orderBy(asc(sitePhotos.sortOrder)),
+    selectedCourtIds.length ? db.select({ id: courtPhotos.id, courtId: courtPhotos.courtId, url: sql<string>`'/api/venue-photos/court/' || ${courtPhotos.id}::text`, altText: courtPhotos.altText, isCover: courtPhotos.isCover }).from(courtPhotos).where(inArray(courtPhotos.courtId, selectedCourtIds)).orderBy(asc(courtPhotos.sortOrder)) : [],
     db.select({ id: merchantMemberships.id, role: merchantMemberships.role, status: merchantMemberships.status, fullName: users.fullName, email: users.email }).from(merchantMemberships).innerJoin(users, eq(users.id, merchantMemberships.userId)).where(eq(merchantMemberships.merchantId, access.membership.merchantId)).orderBy(asc(users.fullName)),
     db.select({ membershipId: merchantSiteAssignments.membershipId, siteId: merchantSiteAssignments.siteId }).from(merchantSiteAssignments).where(and(eq(merchantSiteAssignments.merchantId, access.membership.merchantId), eq(merchantSiteAssignments.siteId, selectedSiteId))),
   ]) : [[], [], [], [], [], []];
@@ -191,7 +191,7 @@ export default async function MerchantSitesPreview({ searchParams }: { searchPar
 
             {activeTab === "staff" ? <div className="p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><h3 className="font-black">Assigned staff</h3><p className="mt-1 text-xs text-[var(--text-muted)]">Owners automatically have access to every site.</p></div><Link href="/merchant/team" className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white">Manage team</Link></div><div className="mt-4 divide-y divide-[var(--line)] rounded-xl border border-[var(--line)]">{siteStaff.map((member) => <div key={member.id} className="flex items-center justify-between gap-3 p-4"><div><strong className="block">{member.fullName}</strong><small className="text-[var(--text-muted)]">{member.email}</small></div><div className="text-right"><span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-xs font-black">{formatMerchantRole(member.role)}</span><small className="mt-1 block capitalize text-[var(--text-muted)]">{member.status}</small></div></div>)}</div></div> : null}
 
-            {activeTab === "photos" ? <div className="space-y-7 p-5 sm:p-6"><section><h3 className="font-black">Site photos</h3><form action={uploadVenuePhoto} className="mt-4 grid gap-3 rounded-xl border border-dashed border-[var(--line)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><input type="hidden" name="siteId" value={selectedSite.id} /><label className="text-xs font-black">Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="mt-1.5 block w-full text-xs" /></label><label className="text-xs font-black">Alt text<input name="altText" maxLength={200} placeholder="Describe the photo" className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white">Upload</button></form><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selectedSitePhotos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} />)}</div></section>{selectedCourts.map((court) => { const photos = selectedCourtPhotos.filter((photo) => photo.courtId === court.id); return <section key={court.id} className="border-t border-[var(--line)] pt-6"><h3 className="font-black">{court.name}</h3><form action={uploadVenuePhoto} className="mt-4 grid gap-3 rounded-xl border border-dashed border-[var(--line)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><input type="hidden" name="siteId" value={selectedSite.id} /><input type="hidden" name="courtId" value={court.id} /><label className="text-xs font-black">Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="mt-1.5 block w-full text-xs" /></label><label className="text-xs font-black">Alt text<input name="altText" maxLength={200} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white">Upload</button></form><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{photos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} courtId={court.id} />)}</div></section>; })}</div> : null}
+            {activeTab === "photos" ? <div className="space-y-7 p-5 sm:p-6"><section><h3 className="font-black">Site photos</h3><VenuePhotoUpload siteId={selectedSite.id} /><p className="mt-2 text-xs text-[var(--text-muted)]">JPG, PNG, or WebP · maximum 8 MB.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selectedSitePhotos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} />)}</div></section>{selectedCourts.map((court) => { const photos = selectedCourtPhotos.filter((photo) => photo.courtId === court.id); return <section key={court.id} className="border-t border-[var(--line)] pt-6"><h3 className="font-black">{court.name}</h3><VenuePhotoUpload siteId={selectedSite.id} courtId={court.id} /><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{photos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} courtId={court.id} />)}</div></section>; })}</div> : null}
 
             {activeTab === "settings" ? (
               <div className="space-y-8 p-5 sm:p-6">

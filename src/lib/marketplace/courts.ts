@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { courts, merchants, sitePhotos, sites } from "@/db/schema";
 
@@ -36,7 +36,7 @@ export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
       city: sites.city,
       province: sites.province,
       amenities: sites.amenities,
-      coverUrl: sitePhotos.url,
+      coverUrl: sql<string | null>`case when ${sitePhotos.id} is null then null else '/api/venue-photos/site/' || ${sitePhotos.id}::text end`,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
       courtId: courts.id,
