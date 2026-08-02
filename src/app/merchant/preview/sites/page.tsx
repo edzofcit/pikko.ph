@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MerchantPreviewShell } from "@/components/merchant-preview-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { SiteLocationPicker } from "@/components/site-location-picker";
 import { getDb } from "@/db";
 import {
   courtPhotos,
@@ -62,9 +63,9 @@ export default async function MerchantSitesPreview({ searchParams }: { searchPar
   const db = getDb();
   const assignedIds = access.sites.map((site) => site.id);
   const siteRows = access.membership.role === "owner"
-    ? await db.select({ id: sites.id, name: sites.name, slug: sites.slug, status: sites.status, addressLine1: sites.addressLine1, city: sites.city, province: sites.province, timezone: sites.timezone, contactEmail: sites.contactEmail, contactPhone: sites.contactPhone, amenities: sites.amenities }).from(sites).where(eq(sites.merchantId, access.membership.merchantId)).orderBy(asc(sites.name))
+    ? await db.select({ id: sites.id, name: sites.name, slug: sites.slug, status: sites.status, addressLine1: sites.addressLine1, city: sites.city, province: sites.province, latitude: sites.latitude, longitude: sites.longitude, timezone: sites.timezone, contactEmail: sites.contactEmail, contactPhone: sites.contactPhone, amenities: sites.amenities }).from(sites).where(eq(sites.merchantId, access.membership.merchantId)).orderBy(asc(sites.name))
     : assignedIds.length
-      ? await db.select({ id: sites.id, name: sites.name, slug: sites.slug, status: sites.status, addressLine1: sites.addressLine1, city: sites.city, province: sites.province, timezone: sites.timezone, contactEmail: sites.contactEmail, contactPhone: sites.contactPhone, amenities: sites.amenities }).from(sites).where(and(eq(sites.merchantId, access.membership.merchantId), inArray(sites.id, assignedIds))).orderBy(asc(sites.name))
+      ? await db.select({ id: sites.id, name: sites.name, slug: sites.slug, status: sites.status, addressLine1: sites.addressLine1, city: sites.city, province: sites.province, latitude: sites.latitude, longitude: sites.longitude, timezone: sites.timezone, contactEmail: sites.contactEmail, contactPhone: sites.contactPhone, amenities: sites.amenities }).from(sites).where(and(eq(sites.merchantId, access.membership.merchantId), inArray(sites.id, assignedIds))).orderBy(asc(sites.name))
       : [];
   const visibleIds = siteRows.map((site) => site.id);
   const [courtRows, allSitePhotos] = visibleIds.length ? await Promise.all([
@@ -123,7 +124,25 @@ export default async function MerchantSitesPreview({ searchParams }: { searchPar
 
             {activeTab === "photos" ? <div className="space-y-7 p-5 sm:p-6"><section><h3 className="font-black">Site photos</h3><form action={uploadVenuePhoto} className="mt-4 grid gap-3 rounded-xl border border-dashed border-[var(--line)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><input type="hidden" name="siteId" value={selectedSite.id} /><label className="text-xs font-black">Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="mt-1.5 block w-full text-xs" /></label><label className="text-xs font-black">Alt text<input name="altText" maxLength={200} placeholder="Describe the photo" className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white">Upload</button></form><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selectedSitePhotos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} />)}</div></section>{selectedCourts.map((court) => { const photos = selectedCourtPhotos.filter((photo) => photo.courtId === court.id); return <section key={court.id} className="border-t border-[var(--line)] pt-6"><h3 className="font-black">{court.name}</h3><form action={uploadVenuePhoto} className="mt-4 grid gap-3 rounded-xl border border-dashed border-[var(--line)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><input type="hidden" name="siteId" value={selectedSite.id} /><input type="hidden" name="courtId" value={court.id} /><label className="text-xs font-black">Photo<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="mt-1.5 block w-full text-xs" /></label><label className="text-xs font-black">Alt text<input name="altText" maxLength={200} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white">Upload</button></form><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{photos.map((photo) => <PhotoCard key={photo.id} photo={photo} siteId={selectedSite.id} courtId={court.id} />)}</div></section>; })}</div> : null}
 
-            {activeTab === "settings" ? <form action={updateSiteSettings} className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6"><input type="hidden" name="siteId" value={selectedSite.id} /><h3 className="font-black sm:col-span-2">Site settings</h3><label className="text-xs font-black sm:col-span-2">Site name<input name="name" required defaultValue={selectedSite.name} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><label className="text-xs font-black sm:col-span-2">Street address<input name="addressLine1" required defaultValue={selectedSite.addressLine1} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><label className="text-xs font-black">City<input name="city" required defaultValue={selectedSite.city} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><label className="text-xs font-black">Status<select name="status" defaultValue={selectedSite.status} className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 font-normal"><option value="draft">Draft</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label><label className="text-xs font-black">Contact email<input name="contactEmail" type="email" defaultValue={selectedSite.contactEmail ?? ""} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><label className="text-xs font-black">Contact phone<input name="contactPhone" defaultValue={selectedSite.contactPhone ?? ""} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label><button className="w-fit rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white sm:col-span-2">Save site settings</button></form> : null}
+            {activeTab === "settings" ? (
+              <form action={updateSiteSettings} className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+                <input type="hidden" name="siteId" value={selectedSite.id} />
+                <h3 className="font-black sm:col-span-2">Site settings</h3>
+                <label className="text-xs font-black sm:col-span-2">Site name<input name="name" required defaultValue={selectedSite.name} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
+                <label className="text-xs font-black sm:col-span-2">Street address<input name="addressLine1" required defaultValue={selectedSite.addressLine1} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
+                <label className="text-xs font-black">City<input name="city" required defaultValue={selectedSite.city} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
+                <label className="text-xs font-black">Status<select name="status" defaultValue={selectedSite.status} className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 font-normal"><option value="draft">Draft</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+                <label className="text-xs font-black">Contact email<input name="contactEmail" type="email" defaultValue={selectedSite.contactEmail ?? ""} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
+                <label className="text-xs font-black">Contact phone<input name="contactPhone" defaultValue={selectedSite.contactPhone ?? ""} className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
+                <SiteLocationPicker
+                  initialLatitude={selectedSite.latitude}
+                  initialLongitude={selectedSite.longitude}
+                  initialSearch={`${selectedSite.name}, ${selectedSite.addressLine1}, ${selectedSite.city}, Philippines`}
+                  tileUrl={process.env.OSM_TILE_URL}
+                />
+                <button className="w-fit rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white sm:col-span-2">Save site settings</button>
+              </form>
+            ) : null}
           </article> : null}
         </section>
       )}

@@ -72,6 +72,8 @@ export type SiteAvailability = {
     addressLine1: string;
     city: string;
     province: string | null;
+    latitude: string | null;
+    longitude: string | null;
     timezone: string;
     amenities: string[];
     bookingLeadMinutes: number;
@@ -261,6 +263,8 @@ export async function getSiteAvailability(
       addressLine1: sites.addressLine1,
       city: sites.city,
       province: sites.province,
+      latitude: sites.latitude,
+      longitude: sites.longitude,
       timezone: sites.timezone,
       amenities: sites.amenities,
       bookingLeadMinutes: sites.bookingLeadMinutes,
@@ -334,6 +338,8 @@ export async function getSiteAvailability(
         addressLine1: venue.addressLine1,
         city: venue.city,
         province: venue.province,
+        latitude: venue.latitude,
+        longitude: venue.longitude,
         timezone: venue.timezone,
         amenities: venue.amenities,
         bookingLeadMinutes: venue.bookingLeadMinutes,
@@ -556,6 +562,8 @@ export async function getSiteAvailability(
       addressLine1: venue.addressLine1,
       city: venue.city,
       province: venue.province,
+      latitude: venue.latitude,
+      longitude: venue.longitude,
       timezone: venue.timezone,
       amenities: venue.amenities,
       bookingLeadMinutes: venue.bookingLeadMinutes,

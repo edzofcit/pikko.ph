@@ -39,6 +39,27 @@ function parseHourlyRate(value: FormDataEntryValue | null) {
   return Math.round(amount * 100);
 }
 
+function parseCoordinates(formData: FormData) {
+  const latitudeValue = String(formData.get("latitude") ?? "").trim();
+  const longitudeValue = String(formData.get("longitude") ?? "").trim();
+  if (!latitudeValue && !longitudeValue) return { valid: true, latitude: null, longitude: null };
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (
+    !latitudeValue ||
+    !longitudeValue ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return { valid: false, latitude: null, longitude: null };
+  }
+  return { valid: true, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6) };
+}
+
 export async function createSite(formData: FormData) {
   const access = await requireMerchantPermission("manage_courts");
 
@@ -51,6 +72,7 @@ export async function createSite(formData: FormData) {
   const addressLine1 = String(formData.get("addressLine1") ?? "").trim();
   const city = String(formData.get("city") ?? "").trim();
   const province = String(formData.get("province") ?? "").trim();
+  const coordinates = parseCoordinates(formData);
   const opensAt = String(formData.get("opensAt") ?? "");
   const closesAt = String(formData.get("closesAt") ?? "");
 
@@ -62,6 +84,7 @@ export async function createSite(formData: FormData) {
     city.length < 2 ||
     city.length > 100 ||
     province.length > 100 ||
+    !coordinates.valid ||
     !/^\d{2}:\d{2}$/.test(opensAt) ||
     !/^\d{2}:\d{2}$/.test(closesAt) ||
     opensAt >= closesAt
@@ -94,6 +117,8 @@ export async function createSite(formData: FormData) {
       addressLine1,
       city,
       province: province || null,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
       contactEmail: access.user.email,
     }),
     db.insert(siteOperatingHours).values(

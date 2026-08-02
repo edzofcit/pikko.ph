@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { SiteLocationPicker } from "@/components/site-location-picker";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
@@ -155,6 +156,7 @@ export default async function MerchantVenuesPage({
               Province <span className="font-normal">(optional)</span>
               <input name="province" maxLength={100} autoComplete="address-level1" className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 font-normal" />
             </label>
+            <SiteLocationPicker tileUrl={process.env.OSM_TILE_URL} />
             <label className="block text-sm font-bold">
               Opens
               <input name="opensAt" type="time" required defaultValue="06:00" className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 font-normal" />

@@ -61,6 +61,9 @@ export default async function PublicSitePage({
   const address = `${availability.site.addressLine1}, ${availability.site.city}${
     availability.site.province ? `, ${availability.site.province}` : ""
   }`;
+  const mapUrl = availability.site.latitude && availability.site.longitude
+    ? `https://www.openstreetmap.org/?mlat=${encodeURIComponent(availability.site.latitude)}&mlon=${encodeURIComponent(availability.site.longitude)}#map=17/${encodeURIComponent(availability.site.latitude)}/${encodeURIComponent(availability.site.longitude)}`
+    : null;
   const calendarWeekStart = mondayOfWeek(availability.date);
   const quickDateStart =
     calendarWeekStart < availability.earliestDate
@@ -109,6 +112,11 @@ export default async function PublicSitePage({
             </p>
             {availability.site.description ? (
               <p className="mt-2 text-sm font-semibold text-[var(--forest)]">{address}</p>
+            ) : null}
+            {mapUrl ? (
+              <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-black text-[var(--forest)] hover:border-[var(--forest)]">
+                View location on OpenStreetMap ↗
+              </a>
             ) : null}
           </div>
 

@@ -42,6 +42,27 @@ function parseMoney(value: FormDataEntryValue | null) {
   return Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000 ? Math.round(amount * 100) : null;
 }
 
+function parseCoordinates(formData: FormData) {
+  const latitudeValue = String(formData.get("latitude") ?? "").trim();
+  const longitudeValue = String(formData.get("longitude") ?? "").trim();
+  if (!latitudeValue && !longitudeValue) return { valid: true, latitude: null, longitude: null };
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (
+    !latitudeValue ||
+    !longitudeValue ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return { valid: false, latitude: null, longitude: null };
+  }
+  return { valid: true, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6) };
+}
+
 export async function createRateRule(formData: FormData) {
   const siteId = String(formData.get("siteId") ?? "");
   const { access } = await requireOwnedSite("manage_pricing", siteId);
@@ -104,17 +125,19 @@ export async function updateAmenities(formData: FormData) {
 
 export async function updateSiteSettings(formData: FormData) {
   const siteId = String(formData.get("siteId") ?? "");
-  const { access } = await requireOwnedSite("manage_courts", siteId);
+  const { access, site } = await requireOwnedSite("manage_courts", siteId);
   const name = String(formData.get("name") ?? "").trim();
   const addressLine1 = String(formData.get("addressLine1") ?? "").trim();
   const city = String(formData.get("city") ?? "").trim();
   const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
   const contactPhone = String(formData.get("contactPhone") ?? "").trim();
   const status = String(formData.get("status") ?? "active");
-  if (name.length < 2 || name.length > 160 || addressLine1.length < 4 || city.length < 2 || !new Set(["draft", "active", "inactive"]).has(status) || (contactEmail && !contactEmail.includes("@"))) redirect(previewUrl(siteId, "settings", "Check the site settings.", true));
-  await getDb().update(sites).set({ name, addressLine1, city, contactEmail: contactEmail || null, contactPhone: contactPhone || null, status: status as "draft" | "active" | "inactive", updatedAt: new Date() }).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId)));
-  await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.updated", targetType: "site", targetId: siteId, after: { name, addressLine1, city, contactEmail, contactPhone, status } });
+  const coordinates = parseCoordinates(formData);
+  if (name.length < 2 || name.length > 160 || addressLine1.length < 4 || city.length < 2 || !coordinates.valid || !new Set(["draft", "active", "inactive"]).has(status) || (contactEmail && !contactEmail.includes("@"))) redirect(previewUrl(siteId, "settings", "Check the site settings and map coordinates.", true));
+  await getDb().update(sites).set({ name, addressLine1, city, latitude: coordinates.latitude, longitude: coordinates.longitude, contactEmail: contactEmail || null, contactPhone: contactPhone || null, status: status as "draft" | "active" | "inactive", updatedAt: new Date() }).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId)));
+  await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.updated", targetType: "site", targetId: siteId, after: { name, addressLine1, city, latitude: coordinates.latitude, longitude: coordinates.longitude, contactEmail, contactPhone, status } });
   revalidatePath("/merchant/preview/sites");
+  revalidatePath(`/${access.membership.merchantSlug}/${site.slug}`);
   redirect(previewUrl(siteId, "settings", "Site settings updated."));
 }
 

@@ -68,3 +68,19 @@ textarea:focus-visible {
   letter-spacing: -0.055em;
   line-height: 0.95;
 }
+
+.pikko-map-marker {
+  background: transparent;
+  border: 0;
+}
+
+.pikko-map-marker span {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 4px solid white;
+  border-radius: 50% 50% 50% 0;
+  background: var(--forest);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 28%);
+  transform: rotate(-45deg);
+}
