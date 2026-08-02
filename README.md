@@ -10,6 +10,8 @@ This first application baseline includes:
 - A mobile-first public booking preview with selectable hourly court slots.
 - Real public merchant and site routes backed by tenant-scoped court, schedule,
   allocation, and pricing data.
+- Guest manual-payment booking requests with atomic court allocation, secure
+  booking links, merchant instructions, and configurable payment deadlines.
 - Merchant and platform-administrator dashboard shells.
 - A Vercel-friendly health endpoint at `/api/health`.
 - A Neon PostgreSQL schema managed with Drizzle migrations.
@@ -18,9 +20,11 @@ This first application baseline includes:
 - Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
-The landing-page preview and dashboard metrics still contain sample presentation
-data. Public routes at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}` now
-use persisted venue data and revalidate selected slots before checkout review.
+The landing-page preview still contains sample presentation data. Public routes
+at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}` use persisted venue
+data, revalidate selected slots at checkout, and write manual-payment bookings
+using the database overlap guard. The merchant dashboard reads recent bookings
+from persisted data.
 
 ## Run locally
 

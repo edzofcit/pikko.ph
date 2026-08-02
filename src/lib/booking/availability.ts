@@ -56,6 +56,11 @@ export type SiteAvailability = {
     amenities: string[];
     bookingLeadMinutes: number;
     advanceBookingDays: number;
+    onlinePaymentEnabled: boolean;
+    manualPaymentEnabled: boolean;
+    manualReservationMode: "reserve_immediately" | "reserve_after_verification";
+    manualPaymentDeadlineMinutes: number;
+    manualPaymentInstructions: string | null;
   };
   date: string;
   earliestDate: string;
@@ -239,6 +244,11 @@ export async function getSiteAvailability(
       amenities: sites.amenities,
       bookingLeadMinutes: sites.bookingLeadMinutes,
       advanceBookingDays: sites.advanceBookingDays,
+      onlinePaymentEnabled: sites.onlinePaymentEnabled,
+      manualPaymentEnabled: sites.manualPaymentEnabled,
+      manualReservationMode: sites.manualReservationMode,
+      manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
+      manualPaymentInstructions: sites.manualPaymentInstructions,
     })
     .from(sites)
     .innerJoin(merchants, eq(sites.merchantId, merchants.id))
@@ -306,6 +316,11 @@ export async function getSiteAvailability(
         amenities: venue.amenities,
         bookingLeadMinutes: venue.bookingLeadMinutes,
         advanceBookingDays: venue.advanceBookingDays,
+        onlinePaymentEnabled: venue.onlinePaymentEnabled,
+        manualPaymentEnabled: venue.manualPaymentEnabled,
+        manualReservationMode: venue.manualReservationMode,
+        manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
+        manualPaymentInstructions: venue.manualPaymentInstructions,
       },
       date,
       earliestDate,
@@ -477,6 +492,11 @@ export async function getSiteAvailability(
       amenities: venue.amenities,
       bookingLeadMinutes: venue.bookingLeadMinutes,
       advanceBookingDays: venue.advanceBookingDays,
+      onlinePaymentEnabled: venue.onlinePaymentEnabled,
+      manualPaymentEnabled: venue.manualPaymentEnabled,
+      manualReservationMode: venue.manualReservationMode,
+      manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
+      manualPaymentInstructions: venue.manualPaymentInstructions,
     },
     date,
     earliestDate,

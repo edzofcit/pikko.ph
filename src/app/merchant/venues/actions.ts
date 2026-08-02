@@ -13,13 +13,16 @@ type VenueMessage =
   | "court-created"
   | "court-updated"
   | "invalid-court"
+  | "invalid-payment-settings"
   | "invalid-site"
+  | "payment-settings-updated"
   | "site-created";
 
 function venuesUrl(message: VenueMessage) {
   const parameter =
     message === "court-created" ||
     message === "court-updated" ||
+    message === "payment-settings-updated" ||
     message === "site-created"
       ? "success"
       : "error";
@@ -241,4 +244,54 @@ export async function updateCourt(formData: FormData) {
     `/${access.membership.merchantSlug}/${ownedCourt.siteSlug}`,
   );
   redirect(venuesUrl("court-updated"));
+}
+
+export async function updateSitePaymentSettings(formData: FormData) {
+  const access = await requireMerchantPermission("manage_courts");
+  const merchantId = access.membership.merchantId;
+  const siteId = String(formData.get("siteId") ?? "");
+  const manualPaymentEnabled = formData.get("manualPaymentEnabled") === "on";
+  const manualReservationMode = String(formData.get("manualReservationMode") ?? "");
+  const deadlineMinutes = Number(formData.get("manualPaymentDeadlineMinutes"));
+  const instructions = String(formData.get("manualPaymentInstructions") ?? "").trim();
+  const allowedModes = new Set([
+    "reserve_immediately",
+    "reserve_after_verification",
+  ]);
+
+  if (
+    !siteId ||
+    !access.sites.some((site) => site.id === siteId) ||
+    !allowedModes.has(manualReservationMode) ||
+    !Number.isInteger(deadlineMinutes) ||
+    deadlineMinutes < 5 ||
+    deadlineMinutes > 1440 ||
+    instructions.length > 5000 ||
+    (manualPaymentEnabled && instructions.length < 10)
+  ) {
+    redirect(venuesUrl("invalid-payment-settings"));
+  }
+
+  const db = getDb();
+  const [updated] = await db
+    .update(sites)
+    .set({
+      manualPaymentEnabled,
+      manualReservationMode: manualReservationMode as
+        | "reserve_immediately"
+        | "reserve_after_verification",
+      manualPaymentDeadlineMinutes: deadlineMinutes,
+      manualPaymentInstructions: instructions || null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(sites.id, siteId), eq(sites.merchantId, merchantId)))
+    .returning({ slug: sites.slug });
+
+  if (!updated) {
+    redirect(venuesUrl("invalid-payment-settings"));
+  }
+
+  revalidatePath("/merchant/venues");
+  revalidatePath(`/${access.membership.merchantSlug}/${updated.slug}`);
+  redirect(venuesUrl("payment-settings-updated"));
 }
