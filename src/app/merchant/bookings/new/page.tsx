@@ -41,7 +41,7 @@ export default async function NewMerchantBookingPage({
         { href: "/merchant", label: "Dashboard" },
         { href: "/merchant/schedule", label: "Schedule" },
         ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/venues", label: "Sites & courts" }]
+          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
           : []),
       ]}
       metrics={[
@@ -123,7 +123,7 @@ export default async function NewMerchantBookingPage({
             Add a venue or ask the merchant owner to assign you to a site.
           </p>
           {access.permissions.includes("manage_courts") ? (
-            <Link href="/merchant/venues" className="mt-6 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
+            <Link href="/merchant/sites" className="mt-6 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
               Manage sites and courts
             </Link>
           ) : null}

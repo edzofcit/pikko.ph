@@ -84,7 +84,7 @@ export default async function MerchantTeamPage({
           ? [{ href: "/merchant/schedule", label: "Schedule" }]
           : []),
         ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/venues", label: "Sites & courts" }]
+          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
           : []),
       ]}
       metrics={[

@@ -10,7 +10,7 @@ import { formatMerchantRole } from "@/lib/auth/permissions";
 import { getMerchantBookingList } from "@/lib/merchant/booking-list";
 import { formatPeso } from "@/lib/money";
 
-export const metadata: Metadata = { title: "Bookings preview" };
+export const metadata: Metadata = { title: "Bookings" };
 export const dynamic = "force-dynamic";
 
 const bookingStatuses = ["draft", "pending_payment", "pending_verification", "confirmed", "cancelled", "expired", "completed", "no_show"];
@@ -24,7 +24,7 @@ function queryString(query: Record<string, string | undefined>, overrides: Recor
 
 export default async function MerchantBookingsPreview({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const [access, query] = await Promise.all([getMerchantAccess(), searchParams]);
-  if (!access?.user) redirect(`/auth/sign-in?callbackURL=${encodeURIComponent("/merchant/preview/bookings")}`);
+  if (!access?.user) redirect(`/auth/sign-in?callbackURL=${encodeURIComponent("/merchant/bookings")}`);
   if (!access.membership) redirect("/merchant/onboarding");
   if (!access.permissions.includes("manage_bookings")) redirect("/access-denied");
 
@@ -46,7 +46,7 @@ export default async function MerchantBookingsPreview({ searchParams }: { search
   const exportHref = `/api/merchant/preview/bookings.csv?${queryString(query, { site: selectedSiteId || undefined, page: undefined, perPage: undefined })}`;
 
   return (
-    <MerchantPreviewShell merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={selectedSiteId} activeHref="/merchant/preview/bookings" eyebrow="Merchant dashboard preview" title="Bookings" description="Search, filter, and manage reservations across your assigned sites." actions={<><a href={exportHref} className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-xs font-black">Export CSV ↓</a><Link href="/merchant/bookings/new" className="rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white">+ Create booking</Link></>}>
+    <MerchantPreviewShell merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={selectedSiteId} activeHref="/merchant/bookings" eyebrow="Merchant dashboard" title="Bookings" description="Search, filter, and manage reservations across your assigned sites." actions={<><a href={exportHref} className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-xs font-black">Export CSV ↓</a><Link href="/merchant/bookings/new" className="rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white">+ Create booking</Link></>}>
       <section className="mt-7 grid grid-cols-2 gap-3 xl:grid-cols-4">
         {[["Bookings", String(rows.length), "Current filtered result"], ["Revenue", formatPeso(paidRevenue), "Paid reservations"], ["Pending payments", String(pendingCount), "Requires follow-up"], ["Scope", selectedSiteId ? access.sites.find((site) => site.id === selectedSiteId)?.name ?? "Site" : "All sites", `${visibleSiteIds.length} visible site${visibleSiteIds.length === 1 ? "" : "s"}`]].map(([label, value, note]) => <article key={label} className="rounded-2xl border border-[var(--line)] bg-white p-5"><p className="text-xs font-bold text-[var(--text-muted)]">{label}</p><p className="mt-3 text-2xl font-black">{value}</p><p className="mt-2 text-xs text-[var(--forest)]">{note}</p></article>)}
       </section>
@@ -65,7 +65,7 @@ export default async function MerchantBookingsPreview({ searchParams }: { search
             <label className="text-xs font-black">Payment status<select name="paymentStatus" defaultValue={query.paymentStatus ?? ""} className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 font-normal"><option value="">All statuses</option>{paymentStatuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
             <label className="text-xs font-black">From<input name="from" type="date" defaultValue={query.from ?? ""} className="mt-1.5 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
             <label className="text-xs font-black">To<input name="to" type="date" defaultValue={query.to ?? ""} className="mt-1.5 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal" /></label>
-            <div className="flex items-end gap-2"><button className="rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white">Apply filters</button><Link href={selectedSiteId ? `?site=${selectedSiteId}` : "/merchant/preview/bookings"} className="rounded-full border border-[var(--line)] px-4 py-2.5 text-xs font-black">Reset</Link></div>
+            <div className="flex items-end gap-2"><button className="rounded-full bg-[var(--forest)] px-5 py-2.5 text-xs font-black text-white">Apply filters</button><Link href={selectedSiteId ? `?site=${selectedSiteId}` : "/merchant/bookings"} className="rounded-full border border-[var(--line)] px-4 py-2.5 text-xs font-black">Reset</Link></div>
           </form>
         </div>
 

@@ -82,5 +82,5 @@ export async function createMerchantAccount(formData: FormData) {
   ]);
 
   revalidatePath("/merchant");
-  redirect("/merchant/venues?success=merchant-created");
+  redirect("/merchant/sites?success=Merchant+account+created.+Add+your+first+site.");
 }

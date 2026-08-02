@@ -95,7 +95,7 @@ export default async function MerchantBlocksPage({
       navigation={[
         { href: "/merchant", label: "Dashboard" },
         { href: "/merchant/schedule", label: "Schedule" },
-        { href: "/merchant/venues", label: "Sites & courts" },
+        { href: "/merchant/sites", label: "Sites & courts" },
       ]}
       metrics={[
         { label: "Selected site", value: selectedSite?.name ?? "None", note: "Assigned venue" },

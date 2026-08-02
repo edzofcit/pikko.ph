@@ -22,7 +22,10 @@ const ALLOWED_TYPES = new Map([
 ]);
 
 function venuesUrl(request: Request, kind: "success" | "error", message: string) {
-  const url = new URL("/merchant/venues", request.url);
+  const siteId = new URL(request.url).pathname.split("/")[4] ?? "";
+  const url = new URL("/merchant/sites", request.url);
+  if (siteId) url.searchParams.set("site", siteId);
+  url.searchParams.set("tab", "settings");
   url.searchParams.set(kind, message);
   return url;
 }
@@ -71,7 +74,7 @@ export async function POST(
     params,
     requireMerchantPermission("manage_courts"),
   ]);
-  if (!access.sites.some((site) => site.id === siteId)) {
+  if (access.membership.role !== "owner" && !access.sites.some((site) => site.id === siteId)) {
     return NextResponse.redirect(
       venuesUrl(request, "error", "You cannot update that site."),
       303,

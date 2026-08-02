@@ -181,7 +181,7 @@ export default async function MerchantSchedulePage({
       navigation={[
         { href: "/merchant", label: "Dashboard" },
         ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/venues", label: "Sites & courts" }]
+          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
           : []),
         { href: "/customer", label: "Customer mode" },
       ]}
@@ -360,7 +360,7 @@ export default async function MerchantSchedulePage({
         {!siteAvailabilities.length ? (
           <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white px-6 py-12 text-center">
             <p className="font-black">No active courts are assigned to this view.</p>
-            <Link href="/merchant/venues" className="mt-4 inline-flex text-sm font-black text-[var(--forest)] underline underline-offset-4">Manage sites and courts</Link>
+            <Link href="/merchant/sites" className="mt-4 inline-flex text-sm font-black text-[var(--forest)] underline underline-offset-4">Manage sites and courts</Link>
           </div>
         ) : null}
       </section>

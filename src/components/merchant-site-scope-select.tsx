@@ -24,7 +24,12 @@ export function MerchantSiteScopeSelect({
         onChange={(event) => {
           const site = event.target.value;
           startTransition(() => {
-            router.push(site ? `${pathname}?site=${site}` : pathname);
+            const params = new URLSearchParams(window.location.search);
+            params.delete("page");
+            if (site) params.set("site", site);
+            else params.delete("site");
+            const query = params.toString();
+            router.push(query ? `${pathname}?${query}` : pathname);
           });
         }}
         className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-bold text-[var(--forest)] disabled:opacity-60"

@@ -9,38 +9,38 @@ type PreviewSite = { id: string; name: string; slug: string };
 const groups = [
   {
     label: "Workspace",
-    items: [{ href: "/merchant/preview", label: "Overview", icon: "⌂" }],
+    items: [{ href: "/merchant", label: "Overview", icon: "⌂" }],
   },
   {
     label: "Operations",
     items: [
-      { href: "/merchant/preview/bookings", label: "Bookings", icon: "▣", permission: "manage_bookings" },
+      { href: "/merchant/bookings", label: "Bookings", icon: "▣", permission: "manage_bookings" },
       { href: "/merchant/schedule", label: "Calendar", icon: "□", permission: "manage_bookings" },
       { href: "/merchant/bookings/new", label: "Walk-ins", icon: "+", permission: "manage_bookings" },
       { href: "/merchant/blocks", label: "Blocks & maintenance", icon: "⊘", permission: "manage_courts" },
-      { href: "/merchant/preview/sites", label: "Sites & courts", icon: "▦", permission: "manage_courts" },
-      { href: "/merchant/preview/customers", label: "Customers", icon: "♙", permission: "manage_bookings", disabled: true },
+      { href: "/merchant/sites", label: "Sites & courts", icon: "▦", permission: "manage_courts" },
+      { href: "/merchant/customers", label: "Customers", icon: "♙", permission: "manage_bookings", disabled: true },
     ],
   },
   {
     label: "Finance",
     items: [
-      { href: "/merchant/preview/payments", label: "Payments", icon: "₱", permission: "verify_payments", disabled: true },
-      { href: "/merchant/preview/reports", label: "Reports", icon: "↗", disabled: true },
+      { href: "/merchant/payments", label: "Payments", icon: "₱", permission: "verify_payments", disabled: true },
+      { href: "/merchant/reports", label: "Reports", icon: "↗", disabled: true },
     ],
   },
   {
     label: "Management",
     items: [
       { href: "/merchant/team", label: "Team", icon: "♧", permission: "manage_staff" },
-      { href: "/merchant/preview/public", label: "Public page", icon: "◎", disabled: true },
-      { href: "/merchant/preview/settings", label: "Settings", icon: "⚙", disabled: true },
+      { href: "/merchant/public", label: "Public page", icon: "◎", disabled: true },
+      { href: "/merchant/settings", label: "Settings", icon: "⚙", disabled: true },
     ],
   },
 ] as const;
 
 function scopedHref(href: string, selectedSiteId: string) {
-  if (!selectedSiteId || !href.startsWith("/merchant/preview")) return href;
+  if (!selectedSiteId || !href.startsWith("/merchant")) return href;
   return `${href}?site=${selectedSiteId}`;
 }
 
@@ -136,8 +136,15 @@ export function MerchantPreviewShell({
 
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[#f7f5ed]/95 px-5 py-3 backdrop-blur sm:px-8 lg:hidden">
-          <p className="truncate text-sm font-black text-[var(--forest)]">{merchantName} · {scopeLabel}</p>
-          <AccountButton />
+          <p className="min-w-0 truncate text-sm font-black text-[var(--forest)]">{merchantName} · {scopeLabel}</p>
+          <details className="group relative ml-3 shrink-0">
+            <summary className="cursor-pointer list-none rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-black">Menu</summary>
+            <div className="absolute right-0 top-12 z-50 max-h-[75vh] w-72 overflow-y-auto rounded-2xl border border-[var(--line)] bg-white p-3 shadow-xl">
+              {groups.map((group) => <section key={group.label} className="mb-4"><h2 className="px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[var(--text-muted)]">{group.label}</h2><div className="mt-1">{group.items.map((item) => { const permitted = !("permission" in item) || permissions.includes(item.permission); if (!permitted) return null; const disabled = "disabled" in item && item.disabled; return disabled ? <span key={item.href} className="flex px-2 py-2 text-sm text-slate-400">{item.label}<small className="ml-auto">Later</small></span> : <Link key={item.href} href={scopedHref(item.href, selectedSiteId)} className={`block rounded-lg px-2 py-2 text-sm font-bold ${item.href === activeHref ? "bg-[#e5f1e5] text-[var(--forest)]" : "hover:bg-[var(--cream)]"}`}>{item.label}</Link>; })}</div></section>)}
+              <Link href="/customer" className="block rounded-xl bg-[var(--cream)] px-3 py-2.5 text-center text-xs font-black text-[var(--forest)]">Switch to customer mode</Link>
+              <div className="mt-2"><AccountButton /></div>
+            </div>
+          </details>
         </header>
         <div className="mx-auto max-w-[96rem] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
           <header className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">

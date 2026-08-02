@@ -17,7 +17,7 @@ import { formatMerchantRole } from "@/lib/auth/permissions";
 import { getSiteAvailability, type SiteAvailability } from "@/lib/booking/availability";
 import { formatPeso } from "@/lib/money";
 
-export const metadata: Metadata = { title: "Merchant overview preview" };
+export const metadata: Metadata = { title: "Merchant overview" };
 export const dynamic = "force-dynamic";
 
 function addDays(value: string, days: number) {
@@ -49,7 +49,7 @@ export default async function MerchantPreviewOverview({
   searchParams: Promise<{ site?: string }>;
 }) {
   const [access, query] = await Promise.all([getMerchantAccess(), searchParams]);
-  if (!access?.user) redirect(`/auth/sign-in?callbackURL=${encodeURIComponent("/merchant/preview")}`);
+  if (!access?.user) redirect(`/auth/sign-in?callbackURL=${encodeURIComponent("/merchant")}`);
   if (!access.membership) redirect("/merchant/onboarding");
 
   const selectedSiteId = access.sites.some((site) => site.id === query.site) ? query.site! : "";
@@ -170,8 +170,8 @@ export default async function MerchantPreviewOverview({
       permissions={access.permissions}
       sites={access.sites}
       selectedSiteId={selectedSiteId}
-      activeHref="/merchant/preview"
-      eyebrow="Merchant dashboard preview"
+      activeHref="/merchant"
+      eyebrow="Merchant dashboard"
       title={access.membership.merchantName}
       description={`${dateLabel} · Live operational view for ${selectedSiteId ? visibleSites[0]?.name : "all assigned sites"}.`}
       actions={access.permissions.includes("manage_bookings") ? (
@@ -181,7 +181,7 @@ export default async function MerchantPreviewOverview({
       {!visibleSiteIds.length ? (
         <section className="mt-7 rounded-3xl border border-dashed border-[var(--line)] bg-white p-10 text-center">
           <h2 className="text-xl font-black">Add your first site to get started.</h2>
-          {access.permissions.includes("manage_courts") ? <Link href="/merchant/venues" className="mt-5 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">Add site</Link> : null}
+          {access.permissions.includes("manage_courts") ? <Link href="/merchant/sites?mode=new" className="mt-5 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">Add site</Link> : null}
         </section>
       ) : (
         <>
@@ -245,7 +245,7 @@ export default async function MerchantPreviewOverview({
           </section>
 
           <section className="mt-5 overflow-hidden rounded-2xl border border-[var(--line)] bg-white">
-            <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4"><div><h2 className="font-black">Recent bookings</h2><p className="mt-1 text-xs text-[var(--text-muted)]">Today’s latest reservations</p></div><Link href={`/merchant/preview/bookings${siteParam}`} className="text-xs font-black text-[var(--forest)]">View all bookings →</Link></header>
+            <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4"><div><h2 className="font-black">Recent bookings</h2><p className="mt-1 text-xs text-[var(--text-muted)]">Today’s latest reservations</p></div><Link href={`/merchant/bookings${siteParam}`} className="text-xs font-black text-[var(--forest)]">View all bookings →</Link></header>
             <div className="divide-y divide-[var(--line)]">
               {bookingList.slice(0, 8).map((booking) => (
                 <Link key={booking.id} href={`/merchant/bookings/${booking.id}`} className="grid gap-2 px-5 py-4 text-sm hover:bg-[var(--cream)] sm:grid-cols-[0.8fr_1.1fr_1fr_1fr_0.6fr] sm:items-center">
