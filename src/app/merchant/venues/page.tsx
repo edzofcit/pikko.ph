@@ -6,7 +6,12 @@ import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatMerchantRole } from "@/lib/auth/permissions";
-import { createCourt, createSite, updateCourt } from "./actions";
+import {
+  createCourt,
+  createSite,
+  updateCourt,
+  updateSitePaymentSettings,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Sites and courts" };
 export const dynamic = "force-dynamic";
@@ -17,8 +22,11 @@ const feedback = {
   "site-created": "Site created with daily operating hours.",
   "court-created": "Court created and ready for scheduling.",
   "court-updated": "Court details and availability status updated.",
+  "payment-settings-updated": "Manual payment settings updated.",
   "invalid-site": "Check the site details and operating hours.",
   "invalid-court": "Check the site, court name, and hourly rate.",
+  "invalid-payment-settings":
+    "Check the payment deadline and add clear instructions before enabling manual payment.",
 } as const;
 
 export default async function MerchantVenuesPage({
@@ -41,6 +49,10 @@ export default async function MerchantVenuesPage({
             slug: sites.slug,
             city: sites.city,
             province: sites.province,
+            manualPaymentEnabled: sites.manualPaymentEnabled,
+            manualReservationMode: sites.manualReservationMode,
+            manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
+            manualPaymentInstructions: sites.manualPaymentInstructions,
           })
           .from(sites)
           .where(
@@ -222,6 +234,64 @@ export default async function MerchantVenuesPage({
                 >
                   View public availability
                 </Link>
+                <details className="mt-4 max-w-2xl rounded-xl border border-[var(--line)] p-4">
+                  <summary className="cursor-pointer text-sm font-black text-[var(--forest)]">
+                    Manual payment settings
+                  </summary>
+                  <form action={updateSitePaymentSettings} className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <input name="siteId" type="hidden" value={site.id} />
+                    <label className="flex items-center gap-3 rounded-lg border border-[var(--line)] px-3 py-3 text-xs font-semibold sm:col-span-2">
+                      <input
+                        name="manualPaymentEnabled"
+                        type="checkbox"
+                        defaultChecked={site.manualPaymentEnabled}
+                      />
+                      Allow customers to book using manual payment
+                    </label>
+                    <label className="block text-xs font-bold">
+                      Reservation policy
+                      <select
+                        name="manualReservationMode"
+                        required
+                        defaultValue={site.manualReservationMode}
+                        className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 font-normal"
+                      >
+                        <option value="reserve_immediately">Reserve immediately until deadline</option>
+                        <option value="reserve_after_verification">Reserve only after verification</option>
+                      </select>
+                    </label>
+                    <label className="block text-xs font-bold">
+                      Payment deadline (minutes)
+                      <input
+                        name="manualPaymentDeadlineMinutes"
+                        type="number"
+                        required
+                        min={5}
+                        max={1440}
+                        step={1}
+                        defaultValue={site.manualPaymentDeadlineMinutes}
+                        className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                      />
+                    </label>
+                    <label className="block text-xs font-bold sm:col-span-2">
+                      Customer payment instructions
+                      <textarea
+                        name="manualPaymentInstructions"
+                        rows={5}
+                        maxLength={5000}
+                        defaultValue={site.manualPaymentInstructions ?? ""}
+                        placeholder="Send payment to… Include your booking reference, then send the receipt to…"
+                        className="mt-1.5 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="rounded-full bg-[var(--forest)] px-4 py-2.5 text-xs font-black text-white sm:col-span-2"
+                    >
+                      Save payment settings
+                    </button>
+                  </form>
+                </details>
                 {siteCourts.length > 0 ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {siteCourts.map((court) => (

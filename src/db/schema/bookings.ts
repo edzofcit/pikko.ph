@@ -218,6 +218,34 @@ export const bookings = pgTable(
   ],
 );
 
+export const bookingAccessTokens = pgTable(
+  "booking_access_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id, { onDelete: "cascade" }),
+    bookingId: uuid("booking_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.merchantId, table.bookingId],
+      foreignColumns: [bookings.merchantId, bookings.id],
+      name: "booking_access_tokens_booking_tenant_fk",
+    }).onDelete("cascade"),
+    uniqueIndex("booking_access_tokens_hash_uidx").on(table.tokenHash),
+    index("booking_access_tokens_booking_idx").on(table.bookingId),
+    index("booking_access_tokens_expiry_idx").on(table.expiresAt),
+  ],
+);
+
 export const bookingItems = pgTable(
   "booking_items",
   {

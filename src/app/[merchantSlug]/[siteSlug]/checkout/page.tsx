@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { formatPeso } from "@/lib/money";
+import { CheckoutForm } from "./checkout-form";
 
 export const dynamic = "force-dynamic";
 
@@ -88,14 +89,34 @@ export default async function CheckoutReviewPage({
         </div>
 
         <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--forest)] p-6 text-white">
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">Next milestone</p>
-          <h2 className="mt-3 text-xl font-black">Guest details and payment</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">Guest checkout</p>
+          <h2 className="mt-3 text-xl font-black">Your contact details</h2>
           <p className="mt-3 text-sm leading-6 text-white/75">
-            No court is held or booked on this review screen. The next implementation connects this verified quote to an atomic hold, guest contact details, and Maya or manual payment.
+            We&apos;ll use these details for this booking. You do not need to create an account.
           </p>
-          <Link href={backHref} className="mt-6 inline-flex w-full justify-center rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]">
-            Keep choosing slots
-          </Link>
+          {availability.site.manualPaymentEnabled ? (
+            <div className="mt-6">
+              <CheckoutForm
+                merchantSlug={availability.merchant.slug}
+                siteSlug={availability.site.slug}
+                date={availability.date}
+                courtId={court.id}
+                starts={selectedSlots.map((slot) => slot.startsAt)}
+                deadlineMinutes={availability.site.manualPaymentDeadlineMinutes}
+                reserveImmediately={availability.site.manualReservationMode === "reserve_immediately"}
+              />
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl bg-white/10 p-5">
+              <p className="font-black">Online checkout is not available yet.</p>
+              <p className="mt-2 text-sm leading-6 text-white/75">
+                This venue has not enabled manual payment. Maya QR Ph checkout is the next payment integration.
+              </p>
+              <Link href={backHref} className="mt-5 inline-flex w-full justify-center rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]">
+                Return to availability
+              </Link>
+            </div>
+          )}
         </aside>
       </section>
     </main>
