@@ -14,9 +14,11 @@ function getAuthenticationErrorMessage(error: unknown) {
 
 export function AuthForm({
   mode,
+  audience,
   callbackUrl,
 }: {
   mode: "sign-in" | "sign-up";
+  audience: "customer" | "merchant";
   callbackUrl: string;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +26,7 @@ export function AuthForm({
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isSignUp = mode === "sign-up";
+  const isCustomer = audience === "customer";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,15 +74,31 @@ export function AuthForm({
       className="rounded-3xl border border-[var(--line)] bg-white p-6 shadow-[0_20px_70px_rgb(23_60_42_/_12%)] sm:p-8"
     >
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--coral)]">
-        {isSignUp ? "Create your account" : "Merchant and admin access"}
+        {isCustomer
+          ? isSignUp
+            ? "Create a customer account"
+            : "Customer access"
+          : isSignUp
+            ? "Create merchant access"
+            : "Merchant and admin access"}
       </p>
       <h1 className="display-type mt-3 text-4xl font-black">
-        {isSignUp ? "Join Pikko.ph" : "Welcome back"}
+        {isSignUp
+          ? isCustomer
+            ? "Save your court time."
+            : "Join Pikko.ph"
+          : isCustomer
+            ? "Ready to play?"
+            : "Welcome back"}
       </h1>
       <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
-        {isSignUp
-          ? "Use the same email your merchant owner invited."
-          : "Sign in to your assigned merchant or platform workspace."}
+        {isCustomer
+          ? isSignUp
+            ? "Use one account to see bookings made with your verified email."
+            : "Sign in to view your bookings and find another court."
+          : isSignUp
+            ? "Use the same email your merchant owner invited, or create an account to list a venue."
+            : "Sign in to manage your merchant or platform workspace."}
       </p>
 
       <div className="mt-7 space-y-5">
@@ -165,10 +184,20 @@ export function AuthForm({
       <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
         {isSignUp ? "Already have an account?" : "Need an account?"}{" "}
         <Link
-          href={`${isSignUp ? "/auth/sign-in" : "/auth/sign-up"}?callbackURL=${encodeURIComponent(callbackUrl)}`}
+          href={`${isSignUp ? "/auth/sign-in" : "/auth/sign-up"}?audience=${audience}&callbackURL=${encodeURIComponent(callbackUrl)}`}
           className="font-bold text-[var(--forest)] underline underline-offset-4"
         >
           {isSignUp ? "Sign in" : "Sign up"}
+        </Link>
+      </p>
+
+      <p className="mt-4 text-center text-xs text-[var(--text-muted)]">
+        {isCustomer ? "Managing a venue?" : "Booking for yourself?"}{" "}
+        <Link
+          href={`/auth/${mode}?audience=${isCustomer ? "merchant" : "customer"}&callbackURL=${encodeURIComponent(isCustomer ? "/merchant" : "/customer")}`}
+          className="font-black text-[var(--forest)] underline underline-offset-4"
+        >
+          {isCustomer ? "Merchant login" : "Customer login"}
         </Link>
       </p>
     </form>

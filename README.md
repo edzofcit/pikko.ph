@@ -12,6 +12,8 @@ This first application baseline includes:
   allocation, and pricing data.
 - Guest manual-payment booking requests with atomic court allocation, secure
   booking links, merchant instructions, and configurable payment deadlines.
+- Distinct customer and merchant workspaces backed by one shared identity, so
+  venue operators can switch into customer mode without a second account.
 - Merchant and platform-administrator dashboard shells.
 - A Vercel-friendly health endpoint at `/api/health`.
 - A Neon PostgreSQL schema managed with Drizzle migrations.
@@ -20,11 +22,11 @@ This first application baseline includes:
 - Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
-The landing-page preview still contains sample presentation data. Public routes
-at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}` use persisted venue
-data, revalidate selected slots at checkout, and write manual-payment bookings
-using the database overlap guard. The merchant dashboard reads recent bookings
-from persisted data.
+The landing page lists active marketplace sites and courts from persisted venue
+data. Public routes at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}`
+revalidate selected slots at checkout and write manual-payment bookings using
+the database overlap guard. The merchant dashboard reads recent bookings from
+persisted data.
 
 ## Run locally
 

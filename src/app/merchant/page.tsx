@@ -80,6 +80,7 @@ export default async function MerchantPage() {
       title={`Welcome back, ${access.user.fullName}.`}
       description={`${role} access${siteNames ? ` for ${siteNames}` : ""}. Your role controls every dashboard page and server action.`}
       navigation={[
+        { href: "/customer", label: "Customer mode" },
         ...(access.permissions.includes("manage_courts")
           ? [{ href: "/merchant/venues", label: "Sites & courts" }]
           : []),

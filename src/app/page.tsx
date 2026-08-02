@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { BookingGrid } from "@/components/booking-grid";
 import { Brand } from "@/components/brand";
+import { MarketplaceCourtGrid } from "@/components/marketplace-court-grid";
+import { getMarketplaceSites } from "@/lib/marketplace/courts";
+import { formatPeso } from "@/lib/money";
+
+export const dynamic = "force-dynamic";
 
 const steps = [
   ["01", "Find your court", "Browse nearby venues and compare live hourly rates."],
@@ -8,17 +12,32 @@ const steps = [
   ["03", "Pay and play", "Confirm securely with Maya QR Ph or merchant payment instructions."],
 ];
 
-export default function Home() {
+export default async function Home() {
+  const marketplaceSites = await getMarketplaceSites();
+  const featuredSite = marketplaceSites[0];
+  const featuredCourt = featuredSite?.courts.reduce((lowest, court) =>
+    court.hourlyRateCents < lowest.hourlyRateCents ? court : lowest,
+  );
+  const featuredHref = featuredSite
+    ? `/${featuredSite.merchantSlug}/${featuredSite.slug}`
+    : "/merchant";
+
   return (
     <main>
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
         <Brand />
         <nav className="flex items-center gap-2 sm:gap-3" aria-label="Primary navigation">
           <Link
-            href="/merchant"
-            className="hidden rounded-full px-4 py-2.5 text-sm font-semibold text-[var(--forest)] transition hover:bg-white/70 sm:inline-flex"
+            href="/auth/sign-in?audience=customer&callbackURL=%2Fcustomer"
+            className="hidden rounded-full px-3 py-2.5 text-sm font-semibold text-[var(--forest)] transition hover:bg-white/70 md:inline-flex"
           >
-            For court owners
+            Customer login
+          </Link>
+          <Link
+            href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant"
+            className="rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white"
+          >
+            Merchant login
           </Link>
           <Link
             href="#courts"
@@ -69,13 +88,19 @@ export default function Home() {
             <div className="flex items-start justify-between text-white">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
-                  Next open game
+                  {featuredSite ? "Now in the marketplace" : "List your pickleball venue"}
                 </p>
-                <p className="mt-2 text-2xl font-bold">Saturday · 6:00 PM</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {featuredSite ? featuredSite.name : "Reach players on Pikko.ph"}
+                </p>
               </div>
-              <div className="grid h-14 w-14 place-items-center rounded-full bg-[var(--lime)] text-2xl text-[var(--ink)]">
+              <Link
+                href={featuredHref}
+                aria-label={featuredSite ? `View ${featuredSite.name}` : "List your venue"}
+                className="grid h-14 w-14 place-items-center rounded-full bg-[var(--lime)] text-2xl text-[var(--ink)] transition hover:translate-x-0.5"
+              >
                 ↗
-              </div>
+              </Link>
             </div>
             <div className="mx-auto grid aspect-[1.7] w-[90%] place-items-center rounded-[1.5rem] border-4 border-white/90 bg-[#4f9565] p-4 shadow-[0_18px_50px_rgb(0_0_0_/_28%)] sm:w-[82%]">
               <div className="relative h-full w-full border-2 border-white/90">
@@ -87,11 +112,21 @@ export default function Home() {
             </div>
             <div className="flex items-end justify-between text-white">
               <div>
-                <p className="text-sm text-white/60">The Kitchen · BGC</p>
-                <p className="mt-1 text-lg font-bold">Court 02 · ₱750/hr</p>
+                <p className="text-sm text-white/60">
+                  {featuredSite
+                    ? `${featuredSite.merchantName} · ${featuredSite.city}`
+                    : "Built for Philippine court operators"}
+                </p>
+                <p className="mt-1 text-lg font-bold">
+                  {featuredCourt
+                    ? `${featuredCourt.name} · ${formatPeso(featuredSite.startingRateCents)}/hr`
+                    : "Publish courts and live availability"}
+                </p>
               </div>
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold">
-                4 slots left
+                {featuredSite
+                  ? `${featuredSite.courts.length} ${featuredSite.courts.length === 1 ? "court" : "courts"}`
+                  : "Merchant onboarding"}
               </span>
             </div>
           </div>
@@ -103,17 +138,17 @@ export default function Home() {
           <div className="mb-9 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--coral)]">
-                Live booking preview
+                Live marketplace
               </p>
               <h2 className="display-type mt-3 text-4xl font-black sm:text-5xl">
                 Your next rally starts here.
               </h2>
             </div>
             <p className="max-w-md text-sm leading-6 text-[var(--muted)]">
-              This scaffold uses sample availability. The production version will calculate slots atomically from each venue’s hours, blocks, prices, and bookings.
+              Browse active venues already on Pikko.ph. Each card links to real court schedules, current hourly prices, and server-checked availability.
             </p>
           </div>
-          <BookingGrid />
+          <MarketplaceCourtGrid sites={marketplaceSites} />
         </div>
       </section>
 
@@ -153,6 +188,7 @@ export default function Home() {
         <Brand compact />
         <div className="flex gap-5">
           <Link href="/admin" className="hover:text-[var(--ink)]">Admin</Link>
+          <Link href="/customer" className="hover:text-[var(--ink)]">Customer</Link>
           <Link href="/merchant" className="hover:text-[var(--ink)]">Merchant</Link>
           <span>© 2026 Pikko.ph</span>
         </div>
