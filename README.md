@@ -11,7 +11,8 @@ This first application baseline includes:
 - Real public merchant and site routes backed by tenant-scoped court, schedule,
   allocation, and pricing data.
 - Guest manual-payment booking requests with atomic court allocation, secure
-  booking links, merchant instructions, and configurable payment deadlines.
+  booking links, merchant instructions, configurable payment deadlines, and
+  private screenshot review.
 - Distinct customer and merchant workspaces backed by one shared identity, so
   venue operators can switch into customer mode without a second account.
 - Merchant and platform-administrator dashboard shells.
@@ -69,6 +70,17 @@ Neon provisions `NEON_AUTH_BASE_URL`. Add a unique `NEON_AUTH_COOKIE_SECRET` of 
 
 Vercel runs committed migrations before each build. Drizzle records applied migrations, so unchanged migrations are skipped. A failed migration stops the deployment before the new application version goes live.
 
+## Private payment-proof storage
+
+Manual-payment screenshots use a **private** Vercel Blob store. In the Vercel
+project, create or connect a private Blob store and make its
+`BLOB_READ_WRITE_TOKEN` available to Preview and Production. The token must
+remain server-only. Locally, add the Development store token to `.env.local`.
+
+Uploads accept JPG, PNG, and WebP images up to 3 MB. Files are never linked
+directly: authenticated application routes stream them only to the booking's
+private guest link or authorized merchant staff.
+
 ## Deployment
 
 Import the GitHub repository into Vercel. Next.js build settings are detected automatically. Configure secrets in Vercel for Preview and Production rather than committing `.env.local`.
@@ -79,5 +91,5 @@ Import the GitHub repository into Vercel. Next.js build settings are detected au
 2. Sites, courts, hours, closures, and pricing services.
 3. Atomic availability holds and booking state transitions.
 4. Maya Dynamic QR Ph payment adapter and webhook reconciliation.
-5. Manual payment proof workflow and transactional email.
+5. Transactional booking email.
 6. Reporting, subscriptions, audit trail, and production hardening.

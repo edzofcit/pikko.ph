@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { and, asc, eq, gt, isNull } from "drizzle-orm";
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,20 +9,18 @@ import {
   bookingItems,
   bookings,
   courts,
+  manualPaymentProofs,
   merchants,
   sites,
 } from "@/db/schema";
 import { formatPeso } from "@/lib/money";
+import { hashBookingAccessToken } from "@/lib/booking/access-token";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Booking details",
   robots: { index: false, follow: false },
 };
-
-function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 function formatDateTime(value: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-PH", {
@@ -37,7 +35,7 @@ export default async function GuestBookingPage({
   searchParams,
 }: {
   params: Promise<{ reference: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; uploaded?: string; error?: string }>;
 }) {
   const [{ reference }, query] = await Promise.all([params, searchParams]);
   const token = query.token ?? "";
@@ -79,7 +77,7 @@ export default async function GuestBookingPage({
     .where(
       and(
         eq(bookings.reference, reference),
-        eq(bookingAccessTokens.tokenHash, hashToken(token)),
+        eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
         gt(bookingAccessTokens.expiresAt, new Date()),
         isNull(bookingAccessTokens.revokedAt),
       ),
@@ -106,9 +104,30 @@ export default async function GuestBookingPage({
     )
     .orderBy(asc(bookingItems.startsAt));
 
+  const proofs = await db
+    .select({
+      id: manualPaymentProofs.id,
+      status: manualPaymentProofs.status,
+      originalFilename: manualPaymentProofs.originalFilename,
+      customerNotes: manualPaymentProofs.customerNotes,
+      rejectionReason: manualPaymentProofs.rejectionReason,
+      createdAt: manualPaymentProofs.createdAt,
+    })
+    .from(manualPaymentProofs)
+    .where(
+      and(
+        eq(manualPaymentProofs.bookingId, booking.id),
+        eq(manualPaymentProofs.merchantId, booking.merchantId),
+      ),
+    )
+    .orderBy(asc(manualPaymentProofs.createdAt));
+
   const deadlinePassed =
     booking.paymentDueAt !== null && booking.paymentDueAt <= new Date();
   const publicSiteHref = `/${booking.merchantSlug}/${booking.siteSlug}`;
+  const acceptsProofs =
+    ["pending_payment", "pending_verification"].includes(booking.status) &&
+    booking.paymentStatus !== "paid";
 
   return (
     <main className="min-h-screen">
@@ -178,6 +197,98 @@ export default async function GuestBookingPage({
                 {booking.manualPaymentInstructions ||
                   "Contact the venue using your booking reference for its current payment instructions."}
               </p>
+            </section>
+
+            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
+                Payment proof
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Upload your payment screenshot</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                The merchant will review your screenshot before confirming the booking.
+              </p>
+
+              {query.uploaded === "1" ? (
+                <p className="mt-4 rounded-2xl bg-[var(--mint)] p-4 text-sm font-bold text-[var(--forest)]">
+                  Screenshot uploaded. Your booking is now awaiting merchant verification.
+                </p>
+              ) : null}
+              {query.error ? (
+                <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">
+                  {query.error}
+                </p>
+              ) : null}
+
+              {acceptsProofs ? (
+                <form
+                  action={`/api/bookings/${encodeURIComponent(booking.reference)}/payment-proof`}
+                  method="post"
+                  encType="multipart/form-data"
+                  className="mt-5 space-y-4"
+                >
+                  <input type="hidden" name="token" value={token} />
+                  <label className="block text-sm font-bold">
+                    Screenshot
+                    <input
+                      type="file"
+                      name="screenshot"
+                      accept="image/jpeg,image/png,image/webp"
+                      required
+                      className="mt-2 block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-[var(--forest)] file:px-4 file:py-2 file:font-bold file:text-white"
+                    />
+                  </label>
+                  <p className="text-xs text-[var(--text-muted)]">JPG, PNG, or WebP · maximum 3 MB</p>
+                  <label className="block text-sm font-bold">
+                    Notes for the merchant (optional)
+                    <textarea
+                      name="notes"
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Example: Paid from account ending in 1234"
+                      className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 font-normal outline-none focus:border-[var(--forest)]"
+                    />
+                  </label>
+                  <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
+                    Submit payment proof
+                  </button>
+                </form>
+              ) : (
+                <p className="mt-5 rounded-2xl bg-[var(--paper)] p-4 text-sm text-[var(--text-muted)]">
+                  This booking is no longer accepting payment screenshots.
+                </p>
+              )}
+
+              {proofs.length ? (
+                <div className="mt-7 space-y-4 border-t border-[var(--line)] pt-5">
+                  <h3 className="font-black">Submitted screenshots</h3>
+                  {proofs.map((proof) => (
+                    <article key={proof.id} className="overflow-hidden rounded-2xl border border-[var(--line)]">
+                      <Image
+                        src={`/api/payment-proofs/${proof.id}?token=${encodeURIComponent(token)}`}
+                        alt={`Payment proof ${proof.originalFilename}`}
+                        width={1200}
+                        height={800}
+                        unoptimized
+                        className="h-48 w-full bg-[var(--paper)] object-contain"
+                      />
+                      <div className="p-4 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="truncate font-bold">{proof.originalFilename}</span>
+                          <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-xs font-black uppercase">
+                            {proof.status}
+                          </span>
+                        </div>
+                        {proof.customerNotes ? <p className="mt-2 text-[var(--text-muted)]">{proof.customerNotes}</p> : null}
+                        {proof.rejectionReason ? (
+                          <p className="mt-3 rounded-xl bg-red-50 p-3 font-bold text-red-800">
+                            Merchant response: {proof.rejectionReason}
+                          </p>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </section>
           </div>
 

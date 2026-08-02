@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { desc, eq, inArray } from "drizzle-orm";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { getDb } from "@/db";
@@ -26,6 +27,9 @@ export default async function MerchantPage() {
   const role = formatMerchantRole(access.membership.role);
   const siteNames = access.sites.map((site) => site.name).join(", ");
   const canManageStaff = access.permissions.includes("manage_staff");
+  const canOpenBookings = access.permissions.some(
+    (permission) => permission === "manage_bookings",
+  );
   const siteIds = access.sites.map((site) => site.id);
   const db = getDb();
   const recentBookings = siteIds.length
@@ -105,7 +109,16 @@ export default async function MerchantPage() {
             const item = firstItemByBooking.get(booking.id);
             return (
               <div key={booking.id} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[0.8fr_1.1fr_1.2fr_1fr_0.6fr] sm:items-center">
-                <span className="font-mono text-xs font-bold">{booking.reference}</span>
+                {canOpenBookings ? (
+                  <Link
+                    href={`/merchant/bookings/${booking.id}`}
+                    className="font-mono text-xs font-bold text-[var(--forest)] underline decoration-[var(--lime)] decoration-2 underline-offset-4"
+                  >
+                    {booking.reference}
+                  </Link>
+                ) : (
+                  <span className="font-mono text-xs font-bold">{booking.reference}</span>
+                )}
                 <span className="font-semibold">{item?.courtName ?? booking.siteName}</span>
                 <span className="text-[var(--text-muted)]">
                   {item
