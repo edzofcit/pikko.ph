@@ -84,3 +84,51 @@ textarea:focus-visible {
   box-shadow: 0 3px 12px rgb(0 0 0 / 28%);
   transform: rotate(-45deg);
 }
+
+.pikko-public-map .leaflet-tile-pane {
+  filter: grayscale(0.28) sepia(0.16) saturate(0.72) hue-rotate(72deg) brightness(1.04) contrast(0.9);
+}
+
+.pikko-public-map .leaflet-control-zoom {
+  overflow: hidden;
+  border: 1px solid rgb(23 60 42 / 16%);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(23 60 42 / 14%);
+}
+
+.pikko-public-map .leaflet-control-zoom a {
+  border-color: rgb(255 255 255 / 16%);
+  background: var(--forest);
+  color: white;
+}
+
+.pikko-public-map .leaflet-control-zoom a:hover,
+.pikko-public-map .leaflet-control-zoom a:focus {
+  background: var(--ink);
+  color: var(--lime);
+}
+
+.pikko-public-map .leaflet-control-attribution {
+  margin: 0 8px 8px 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  padding: 3px 9px;
+  color: var(--text-muted);
+  font-size: 9px;
+  backdrop-filter: blur(8px);
+}
+
+.pikko-public-map .leaflet-tooltip {
+  border: 0;
+  border-radius: 999px;
+  background: var(--forest);
+  padding: 7px 11px;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgb(23 60 42 / 20%);
+}
+
+.pikko-public-map .leaflet-tooltip-top::before {
+  border-top-color: var(--forest);
+}

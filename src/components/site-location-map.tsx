@@ -39,7 +39,7 @@ export function SiteLocationMap({ latitude, longitude, siteName, address, tileUr
   return (
     <section className="mt-8 overflow-hidden rounded-3xl border border-[var(--line)] bg-white" aria-labelledby="venue-location-heading">
       <div className="px-5 py-4 sm:px-6"><p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">Venue location</p><h2 id="venue-location-heading" className="mt-1 text-lg font-black">{siteName}</h2><p className="mt-1 text-sm text-[var(--text-muted)]">{address}</p></div>
-      <div ref={containerRef} role="region" aria-label={`Map showing ${siteName} at ${address}`} className="h-72 w-full border-t border-[var(--line)] bg-slate-100 sm:h-96" />
+      <div ref={containerRef} role="region" aria-label={`Map showing ${siteName} at ${address}`} className="pikko-public-map h-72 w-full border-t border-[var(--line)] bg-[#e8eadf] sm:h-96" />
     </section>
   );
 }
