@@ -1,10 +1,20 @@
 import { and, asc, eq, gte, inArray, lt, notInArray, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  AvailabilityLegend,
+  availabilityStateLabels,
+  availabilityStateStyles,
+  type AvailabilityDisplayState,
+} from "@/components/availability-legend";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { getDb } from "@/db";
-import { bookingItems, bookings, courts, merchants, sites } from "@/db/schema";
+import { bookingItems, bookings, merchants } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
+import {
+  getSiteAvailability,
+  type SiteAvailability,
+} from "@/lib/booking/availability";
 import { formatPeso } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Court schedule" };
@@ -36,14 +46,6 @@ function displayDate(value: string) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-function displayTime(value: Date) {
-  return new Intl.DateTimeFormat("en-PH", {
-    timeZone: "Asia/Manila",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(value);
-}
-
 type ScheduleEntry = {
   bookingId: string;
   reference: string;
@@ -56,6 +58,22 @@ type ScheduleEntry = {
   totalCents: number;
   source: string;
 };
+
+function isSiteAvailability(value: SiteAvailability | null): value is SiteAvailability {
+  return value !== null;
+}
+
+function entryForHour(entries: ScheduleEntry[], startsAt: string, endsAt: string) {
+  const starts = new Date(startsAt).getTime();
+  const ends = new Date(endsAt).getTime();
+  return entries.find(
+    (entry) => entry.startsAt.getTime() <= starts && entry.endsAt.getTime() >= ends,
+  );
+}
+
+function entryDisplayState(entry: ScheduleEntry): AvailabilityDisplayState {
+  return entry.paymentStatus === "paid" ? "booked" : "held";
+}
 
 export default async function MerchantSchedulePage({
   searchParams,
@@ -82,30 +100,11 @@ export default async function MerchantSchedulePage({
     ? query.site!
     : "";
   const visibleSiteIds = selectedSiteId ? [selectedSiteId] : allowedSiteIds;
+  const visibleSiteAccess = access.sites.filter((site) => visibleSiteIds.includes(site.id));
   const bounds = dayBounds(selectedDate);
 
-  const [visibleCourts, bookingRows] = visibleSiteIds.length
+  const [bookingRows, siteAvailabilityRows] = visibleSiteIds.length
     ? await Promise.all([
-        db
-          .select({
-            id: courts.id,
-            name: courts.name,
-            siteId: courts.siteId,
-            siteName: sites.name,
-            indoor: courts.indoor,
-            surfaceType: courts.surfaceType,
-            sortOrder: courts.sortOrder,
-          })
-          .from(courts)
-          .innerJoin(sites, eq(sites.id, courts.siteId))
-          .where(
-            and(
-              eq(courts.merchantId, access.membership.merchantId),
-              inArray(courts.siteId, visibleSiteIds),
-              eq(courts.status, "active"),
-            ),
-          )
-          .orderBy(asc(sites.name), asc(courts.sortOrder), asc(courts.name)),
         db
           .select({
             bookingId: bookings.id,
@@ -137,8 +136,14 @@ export default async function MerchantSchedulePage({
             ),
           )
           .orderBy(asc(bookingItems.startsAt)),
+        Promise.all(
+          visibleSiteAccess.map((site) =>
+            getSiteAvailability(access.membership.merchantSlug, site.slug, selectedDate),
+          ),
+        ),
       ])
     : [[], []];
+  const siteAvailabilities = siteAvailabilityRows.filter(isSiteAvailability);
 
   const entriesByCourt = new Map<string, ScheduleEntry[]>();
   for (const row of bookingRows) {
@@ -226,57 +231,121 @@ export default async function MerchantSchedulePage({
         </div>
       </section>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
-        {visibleCourts.map((court) => {
-          const entries = entriesByCourt.get(court.id) ?? [];
+      <section className="mt-6 space-y-5">
+        {siteAvailabilities.map((availability) => {
+          const timeRows = Array.from(
+            new Map(
+              availability.courts.flatMap((court) =>
+                court.schedule.map((slot) => [slot.startsAt, slot.label] as const),
+              ),
+            ),
+          )
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([startsAt, label]) => ({ startsAt, label }));
+          const scheduleByCourt = new Map(
+            availability.courts.map((court) => [
+              court.id,
+              new Map(court.schedule.map((slot) => [slot.startsAt, slot])),
+            ]),
+          );
+
           return (
-            <article key={court.id} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white">
-              <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
+            <article key={availability.site.id} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+              <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] pb-4">
                 <div>
-                  <p className="text-xs font-bold text-[var(--text-muted)]">{court.siteName}</p>
-                  <h2 className="mt-1 text-lg font-black">{court.name}</h2>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    {court.indoor ? "Indoor" : "Outdoor"}{court.surfaceType ? ` · ${court.surfaceType}` : ""}
-                  </p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">Daily court grid</p>
+                  <h2 className="mt-1 text-xl font-black">{availability.site.name}</h2>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">Select open time to create a booking; select a reservation to review it.</p>
                 </div>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-black ${entries.length ? "bg-[var(--mint)] text-[var(--forest)]" : "bg-[var(--cream)] text-[var(--text-muted)]"}`}>
-                  {entries.length ? `${entries.length} scheduled` : "Open day"}
-                </span>
+                <AvailabilityLegend states={["available", "booked", "held", "blocked", "closed", "past", "unavailable"]} />
               </header>
-              <div className="divide-y divide-[var(--line)]">
-                {entries.map((entry) => (
-                  <Link
-                    key={`${entry.bookingId}-${entry.startsAt.toISOString()}`}
-                    href={`/merchant/bookings/${entry.bookingId}`}
-                    className="grid gap-3 px-5 py-4 transition hover:bg-[var(--paper)] sm:grid-cols-[6.5rem_1fr_auto] sm:items-center"
+
+              {timeRows.length > 0 ? (
+                <div className="mt-5 overflow-x-auto pb-2">
+                  <div
+                    role="grid"
+                    aria-label={`${availability.site.name} court schedule`}
+                    className="grid gap-2"
+                    style={{
+                      gridTemplateColumns: `5.5rem repeat(${availability.courts.length}, minmax(9.5rem, 1fr))`,
+                      minWidth: `${5.5 + availability.courts.length * 9.5}rem`,
+                    }}
                   >
-                    <p className="font-black text-[var(--forest)]">
-                      {displayTime(entry.startsAt)}–{displayTime(entry.endsAt)}
-                    </p>
-                    <div>
-                      <p className="text-sm font-black">{entry.customerName ?? "Guest customer"}</p>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        {entry.reference} · {entry.source.replaceAll("_", " ")}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                      <span className="rounded-full bg-[var(--mint)] px-2.5 py-1 text-xs font-black text-[var(--forest)]">{entry.paymentStatus.replaceAll("_", " ")}</span>
-                      <span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-xs font-black text-[var(--text-muted)]">{entry.status.replaceAll("_", " ")}</span>
-                    </div>
-                  </Link>
-                ))}
-                {!entries.length ? (
-                  <div className="px-5 py-10 text-center">
-                    <p className="font-black">No bookings scheduled.</p>
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">This court is currently open for the selected day.</p>
+                    <div role="columnheader" className="sticky left-0 z-20 bg-white px-2 py-3 text-xs font-black text-[var(--text-muted)]">Time</div>
+                    {availability.courts.map((court) => (
+                      <div key={court.id} role="columnheader" className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-3 text-center">
+                        <span className="block text-sm font-black">{court.name}</span>
+                        <span className="mt-1 block text-[0.68rem] text-[var(--text-muted)]">{court.indoor ? "Indoor" : "Outdoor"}</span>
+                      </div>
+                    ))}
+
+                    {timeRows.map((row) => (
+                      <div key={row.startsAt} className="contents" role="row">
+                        <div role="rowheader" className="sticky left-0 z-10 flex min-h-16 items-center bg-white px-2 text-sm font-black text-[var(--forest)]">{row.label}</div>
+                        {availability.courts.map((court) => {
+                          const slot = scheduleByCourt.get(court.id)?.get(row.startsAt);
+                          const entry = slot
+                            ? entryForHour(entriesByCourt.get(court.id) ?? [], slot.startsAt, slot.endsAt)
+                            : undefined;
+                          const state = entry ? entryDisplayState(entry) : slot?.state ?? "closed";
+                          const label = entry
+                            ? entry.paymentStatus === "paid" ? "Booked" : "Payment due"
+                            : availabilityStateLabels[state];
+                          const className = `min-h-16 rounded-xl border px-3 py-2 text-left transition ${availabilityStateStyles[state]}`;
+                          const content = (
+                            <>
+                              <span className="block text-xs font-black">{label}</span>
+                              <span className="mt-1 block truncate text-[0.68rem] opacity-75">
+                                {entry
+                                  ? `${entry.customerName ?? "Guest"} · ${entry.reference}`
+                                  : state === "available" && slot?.rateCents != null
+                                    ? formatPeso(slot.rateCents)
+                                    : availabilityStateLabels[state]}
+                              </span>
+                            </>
+                          );
+
+                          if (entry) {
+                            return (
+                              <Link key={court.id} role="gridcell" href={`/merchant/bookings/${entry.bookingId}`} className={className}>
+                                {content}
+                              </Link>
+                            );
+                          }
+                          if (state === "available") {
+                            return (
+                              <Link
+                                key={court.id}
+                                role="gridcell"
+                                href={`/merchant/bookings/new?site=${availability.site.id}&date=${selectedDate}`}
+                                className={className}
+                                aria-label={`Create booking for ${court.name} at ${row.label}`}
+                              >
+                                {content}
+                              </Link>
+                            );
+                          }
+                          return (
+                            <div key={court.id} role="gridcell" className={`flex min-h-16 items-center ${className}`}>
+                              {content}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
-                ) : null}
-              </div>
+                </div>
+              ) : (
+                <div className="py-10 text-center">
+                  <p className="font-black">The site is closed on this date.</p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">Choose another day to inspect its court schedule.</p>
+                </div>
+              )}
             </article>
           );
         })}
-        {!visibleCourts.length ? (
-          <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white px-6 py-12 text-center lg:col-span-2">
+        {!siteAvailabilities.length ? (
+          <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white px-6 py-12 text-center">
             <p className="font-black">No active courts are assigned to this view.</p>
             <Link href="/merchant/venues" className="mt-4 inline-flex text-sm font-black text-[var(--forest)] underline underline-offset-4">Manage sites and courts</Link>
           </div>
