@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { courts, merchants, sites } from "@/db/schema";
+import { courts, merchants, sitePhotos, sites } from "@/db/schema";
 
 export type MarketplaceSite = {
   id: string;
@@ -14,6 +14,7 @@ export type MarketplaceSite = {
   city: string;
   province: string | null;
   amenities: string[];
+  coverUrl: string | null;
   courts: Array<{
     id: string;
     name: string;
@@ -35,6 +36,7 @@ export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
       city: sites.city,
       province: sites.province,
       amenities: sites.amenities,
+      coverUrl: sitePhotos.url,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
       courtId: courts.id,
@@ -52,6 +54,10 @@ export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
       ),
     )
     .innerJoin(merchants, eq(merchants.id, sites.merchantId))
+    .leftJoin(
+      sitePhotos,
+      and(eq(sitePhotos.siteId, sites.id), eq(sitePhotos.isCover, true)),
+    )
     .where(
       and(
         eq(merchants.status, "active"),
@@ -97,6 +103,7 @@ export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
       city: row.city,
       province: row.province,
       amenities: row.amenities,
+      coverUrl: row.coverUrl,
       courts: [court],
       startingRateCents: row.hourlyRateCents,
     });

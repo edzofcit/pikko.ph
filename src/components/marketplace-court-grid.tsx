@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { MarketplaceSite } from "@/lib/marketplace/courts";
 import { formatPeso } from "@/lib/money";
 
@@ -42,8 +43,14 @@ export function MarketplaceCourtGrid({
           <Link
             key={site.id}
             href={`/${site.merchantSlug}/${site.slug}${date ? `?date=${date}` : ""}`}
-            className="group flex min-h-80 flex-col rounded-[1.75rem] border border-[var(--line)] bg-white p-6 shadow-[0_18px_55px_rgb(23_34_26_/_7%)] transition hover:-translate-y-1 hover:border-[var(--forest)]"
+            className="group flex min-h-80 flex-col overflow-hidden rounded-[1.75rem] border border-[var(--line)] bg-white shadow-[0_18px_55px_rgb(23_34_26_/_7%)] transition hover:-translate-y-1 hover:border-[var(--forest)]"
           >
+            {site.coverUrl ? (
+              <div className="relative aspect-[16/8] bg-[var(--cream)]">
+                <Image src={site.coverUrl} alt={`${site.name} venue`} fill sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" className="object-cover" />
+              </div>
+            ) : null}
+            <div className="flex flex-1 flex-col p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--coral)]">
@@ -93,6 +100,7 @@ export function MarketplaceCourtGrid({
               <span className="text-sm font-black text-[var(--forest)] group-hover:underline">
                 View slots
               </span>
+            </div>
             </div>
           </Link>
         );

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { and, eq } from "drizzle-orm";
+import { getDb } from "@/db";
+import { sitePhotos } from "@/db/schema";
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { SlotPicker } from "./slot-picker";
 
@@ -48,6 +52,11 @@ export default async function PublicSitePage({
   const [{ merchantSlug, siteSlug }, query] = await Promise.all([params, searchParams]);
   const availability = await getSiteAvailability(merchantSlug, siteSlug, query.date);
   if (!availability) notFound();
+  const [coverPhoto] = await getDb()
+    .select({ url: sitePhotos.url, altText: sitePhotos.altText })
+    .from(sitePhotos)
+    .where(and(eq(sitePhotos.siteId, availability.site.id), eq(sitePhotos.isCover, true)))
+    .limit(1);
 
   const address = `${availability.site.addressLine1}, ${availability.site.city}${
     availability.site.province ? `, ${availability.site.province}` : ""
@@ -86,6 +95,11 @@ export default async function PublicSitePage({
       </header>
 
       <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+        {coverPhoto ? (
+          <div className="relative mb-8 aspect-[16/7] overflow-hidden rounded-[2rem] bg-[var(--cream)]">
+            <Image src={coverPhoto.url} alt={coverPhoto.altText || `${availability.site.name} venue`} fill priority sizes="(max-width: 1200px) 100vw, 1152px" className="object-cover" />
+          </div>
+        ) : null}
         <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--coral)]">Book a court</p>

@@ -1,9 +1,10 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
-import { courts, merchants, sites } from "@/db/schema";
+import { courts, merchants, sitePhotos, sites } from "@/db/schema";
 
 export const metadata: Metadata = { title: "Pickleball venues" };
 export const dynamic = "force-dynamic";
@@ -32,9 +33,11 @@ export default async function PublicMerchantPage({
       city: sites.city,
       province: sites.province,
       courtId: courts.id,
+      coverUrl: sitePhotos.url,
     })
     .from(sites)
     .leftJoin(courts, and(eq(courts.siteId, sites.id), eq(courts.status, "active")))
+    .leftJoin(sitePhotos, and(eq(sitePhotos.siteId, sites.id), eq(sitePhotos.isCover, true)))
     .where(and(eq(sites.merchantId, merchant.id), eq(sites.status, "active")))
     .orderBy(asc(sites.name));
   const siteCards = Array.from(
@@ -52,6 +55,7 @@ export default async function PublicMerchantPage({
             city: row.city,
             province: row.province,
             courtCount: row.courtId ? 1 : 0,
+            coverUrl: row.coverUrl,
           });
         }
         return map;
@@ -66,6 +70,7 @@ export default async function PublicMerchantPage({
           city: string;
           province: string | null;
           courtCount: number;
+          coverUrl: string | null;
         }
       >(),
     ).values(),
@@ -102,6 +107,7 @@ export default async function PublicMerchantPage({
               href={`/${merchant.slug}/${site.slug}`}
               className="group rounded-3xl border border-[var(--line)] bg-white p-6 shadow-[0_18px_60px_rgb(23_60_42_/_8%)] transition hover:-translate-y-1 hover:border-[var(--forest)]"
             >
+              {site.coverUrl ? <div className="relative mb-5 aspect-[16/8] overflow-hidden rounded-2xl bg-[var(--cream)]"><Image src={site.coverUrl} alt={`${site.name} venue`} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" /></div> : null}
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-black">{site.name}</h2>

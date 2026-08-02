@@ -1,0 +1,207 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { del, put } from "@vercel/blob";
+import { and, asc, eq, max } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getDb } from "@/db";
+import {
+  auditEvents,
+  courtPhotos,
+  courts,
+  priceRules,
+  siteOperatingHours,
+  sitePhotos,
+  sites,
+} from "@/db/schema";
+import { requireMerchantPermission } from "@/lib/auth/access";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function previewUrl(siteId: string, tab: string, message: string, error = false) {
+  const params = new URLSearchParams({ site: siteId, tab, [error ? "error" : "success"]: message });
+  return `/merchant/preview/sites?${params}`;
+}
+
+async function requireOwnedSite(permission: "manage_courts" | "manage_pricing", siteId: string) {
+  const access = await requireMerchantPermission(permission);
+  if (!UUID.test(siteId)) redirect("/access-denied");
+  const [site] = await getDb().select({ id: sites.id, slug: sites.slug }).from(sites).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId))).limit(1);
+  if (!site) redirect("/access-denied");
+  if (access.membership.role !== "owner" && !access.sites.some((candidate) => candidate.id === siteId)) redirect("/access-denied");
+  return { access, site };
+}
+
+function parseMoney(value: FormDataEntryValue | null) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000 ? Math.round(amount * 100) : null;
+}
+
+export async function createRateRule(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const { access } = await requireOwnedSite("manage_pricing", siteId);
+  const courtId = String(formData.get("courtId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const type = String(formData.get("type") ?? "recurring");
+  const dayValue = String(formData.get("dayOfWeek") ?? "");
+  const dayOfWeek = dayValue === "" ? null : Number(dayValue);
+  const specialDate = String(formData.get("specialDate") ?? "");
+  const startsAt = String(formData.get("startsAt") ?? "");
+  const endsAt = String(formData.get("endsAt") ?? "");
+  const rateCents = parseMoney(formData.get("hourlyRate"));
+  const allowedTypes = new Set(["recurring", "special_date", "seasonal"]);
+  const db = getDb();
+  const [ownedCourt] = courtId ? await db.select({ id: courts.id }).from(courts).where(and(eq(courts.id, courtId), eq(courts.siteId, siteId), eq(courts.merchantId, access.membership.merchantId))).limit(1) : [null];
+  const valid = name.length >= 2 && name.length <= 160 && allowedTypes.has(type) && TIME.test(startsAt) && TIME.test(endsAt) && startsAt < endsAt && rateCents !== null && (!courtId || ownedCourt) && (type !== "recurring" || (Number.isInteger(dayOfWeek) && dayOfWeek! >= 0 && dayOfWeek! <= 6)) && (type !== "special_date" || DATE.test(specialDate));
+  if (!valid) redirect(previewUrl(siteId, "rates", "Check the rate rule details.", true));
+  const [created] = await db.insert(priceRules).values({ merchantId: access.membership.merchantId, siteId, courtId: courtId || null, name, type: type as "recurring" | "special_date" | "seasonal", dayOfWeek: type === "recurring" ? dayOfWeek : null, specialDate: type === "special_date" ? specialDate : null, startsAt, endsAt, activeFrom: type === "seasonal" && DATE.test(String(formData.get("activeFrom") ?? "")) ? String(formData.get("activeFrom")) : null, activeUntil: type === "seasonal" && DATE.test(String(formData.get("activeUntil") ?? "")) ? String(formData.get("activeUntil")) : null, hourlyRateCents: rateCents }).returning({ id: priceRules.id });
+  await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "rate_rule.created", targetType: "price_rule", targetId: created.id, after: { siteId, courtId: courtId || null, name, type, rateCents } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "rates", "Rate rule created."));
+}
+
+export async function deactivateRateRule(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const ruleId = String(formData.get("ruleId") ?? "");
+  const { access } = await requireOwnedSite("manage_pricing", siteId);
+  if (!UUID.test(ruleId)) redirect(previewUrl(siteId, "rates", "Invalid rate rule.", true));
+  const [updated] = await getDb().update(priceRules).set({ active: false, updatedAt: new Date() }).where(and(eq(priceRules.id, ruleId), eq(priceRules.siteId, siteId), eq(priceRules.merchantId, access.membership.merchantId))).returning({ id: priceRules.id });
+  if (!updated) redirect(previewUrl(siteId, "rates", "Rate rule was not found.", true));
+  await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "rate_rule.deactivated", targetType: "price_rule", targetId: ruleId, before: { active: true }, after: { active: false } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "rates", "Rate rule deactivated."));
+}
+
+export async function updateOperatingHours(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  const periods = Array.from({ length: 7 }, (_, dayOfWeek) => ({ dayOfWeek, enabled: formData.get(`enabled-${dayOfWeek}`) === "on", opensAt: String(formData.get(`opens-${dayOfWeek}`) ?? ""), closesAt: String(formData.get(`closes-${dayOfWeek}`) ?? "") }));
+  if (periods.some((period) => period.enabled && (!TIME.test(period.opensAt) || !TIME.test(period.closesAt) || period.opensAt >= period.closesAt))) redirect(previewUrl(siteId, "operating hours", "Check the opening and closing times.", true));
+  const db = getDb();
+  await db.delete(siteOperatingHours).where(and(eq(siteOperatingHours.siteId, siteId), eq(siteOperatingHours.merchantId, access.membership.merchantId)));
+  const enabled = periods.filter((period) => period.enabled);
+  if (enabled.length) await db.insert(siteOperatingHours).values(enabled.map((period) => ({ merchantId: access.membership.merchantId, siteId, dayOfWeek: period.dayOfWeek, opensAt: period.opensAt, closesAt: period.closesAt })));
+  await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.operating_hours_updated", targetType: "site", targetId: siteId, after: { periods: enabled } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "operating hours", "Operating hours updated."));
+}
+
+export async function updateAmenities(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  const amenities = Array.from(new Set(String(formData.get("amenities") ?? "").split(/[,\n]/).map((item) => item.trim()).filter(Boolean))).slice(0, 50);
+  if (amenities.some((item) => item.length > 80)) redirect(previewUrl(siteId, "amenities", "Amenities must be 80 characters or fewer.", true));
+  await getDb().update(sites).set({ amenities, updatedAt: new Date() }).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId)));
+  await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.amenities_updated", targetType: "site", targetId: siteId, after: { amenities } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "amenities", "Amenities updated."));
+}
+
+export async function updateSiteSettings(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  const name = String(formData.get("name") ?? "").trim();
+  const addressLine1 = String(formData.get("addressLine1") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+  const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
+  const contactPhone = String(formData.get("contactPhone") ?? "").trim();
+  const status = String(formData.get("status") ?? "active");
+  if (name.length < 2 || name.length > 160 || addressLine1.length < 4 || city.length < 2 || !new Set(["draft", "active", "inactive"]).has(status) || (contactEmail && !contactEmail.includes("@"))) redirect(previewUrl(siteId, "settings", "Check the site settings.", true));
+  await getDb().update(sites).set({ name, addressLine1, city, contactEmail: contactEmail || null, contactPhone: contactPhone || null, status: status as "draft" | "active" | "inactive", updatedAt: new Date() }).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId)));
+  await getDb().insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "site.updated", targetType: "site", targetId: siteId, after: { name, addressLine1, city, contactEmail, contactPhone, status } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "settings", "Site settings updated."));
+}
+
+export async function uploadVenuePhoto(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const courtId = String(formData.get("courtId") ?? "");
+  const file = formData.get("photo");
+  const altText = String(formData.get("altText") ?? "").trim();
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  const db = getDb();
+  if (!(file instanceof File) || !file.size || file.size > MAX_IMAGE_BYTES || !IMAGE_TYPES.has(file.type) || altText.length > 200 || !process.env.BLOB_READ_WRITE_TOKEN) redirect(previewUrl(siteId, "photos", "Upload a JPG, PNG, or WebP image up to 8 MB.", true));
+  if (courtId) {
+    const [court] = await db.select({ id: courts.id }).from(courts).where(and(eq(courts.id, courtId), eq(courts.siteId, siteId), eq(courts.merchantId, access.membership.merchantId))).limit(1);
+    if (!court) redirect(previewUrl(siteId, "photos", "Court not found.", true));
+  }
+  const table = courtId ? courtPhotos : sitePhotos;
+  const entityIdColumn = courtId ? courtPhotos.courtId : sitePhotos.siteId;
+  const entityId = courtId || siteId;
+  const [{ count, lastOrder }] = await db.select({ count: max(table.sortOrder), lastOrder: max(table.sortOrder) }).from(table).where(eq(entityIdColumn, entityId));
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const pathname = `merchant-media/${access.membership.merchantId}/${courtId ? `courts/${courtId}` : `sites/${siteId}`}/${randomUUID()}.${extension}`;
+  const uploaded = await put(pathname, file, { access: "public", addRandomSuffix: false, contentType: file.type });
+  try {
+    if (courtId) await db.insert(courtPhotos).values({ merchantId: access.membership.merchantId, courtId, url: uploaded.url, pathname: uploaded.pathname, altText: altText || null, isCover: count === null, sortOrder: (lastOrder ?? -1) + 1, createdByUserId: access.user.id });
+    else await db.insert(sitePhotos).values({ merchantId: access.membership.merchantId, siteId, url: uploaded.url, pathname: uploaded.pathname, altText: altText || null, isCover: count === null, sortOrder: (lastOrder ?? -1) + 1, createdByUserId: access.user.id });
+  } catch (error) {
+    await del(uploaded.pathname).catch(() => undefined);
+    console.error("Venue photo database insert failed", error);
+    redirect(previewUrl(siteId, "photos", "The photo could not be saved.", true));
+  }
+  await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "venue_photo.uploaded", targetType: courtId ? "court" : "site", targetId: entityId, after: { pathname: uploaded.pathname, altText } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "photos", "Photo uploaded."));
+}
+
+export async function setVenueCoverPhoto(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const courtId = String(formData.get("courtId") ?? "");
+  const photoId = String(formData.get("photoId") ?? "");
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  if (!UUID.test(photoId)) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+  const db = getDb();
+  if (courtId) {
+    const [photo] = await db.select({ id: courtPhotos.id }).from(courtPhotos).innerJoin(courts, eq(courts.id, courtPhotos.courtId)).where(and(eq(courtPhotos.id, photoId), eq(courtPhotos.courtId, courtId), eq(courts.siteId, siteId), eq(courtPhotos.merchantId, access.membership.merchantId))).limit(1);
+    if (!photo) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+    await db.update(courtPhotos).set({ isCover: false, updatedAt: new Date() }).where(eq(courtPhotos.courtId, courtId));
+    await db.update(courtPhotos).set({ isCover: true, updatedAt: new Date() }).where(eq(courtPhotos.id, photoId));
+  } else {
+    const [photo] = await db.select({ id: sitePhotos.id }).from(sitePhotos).where(and(eq(sitePhotos.id, photoId), eq(sitePhotos.siteId, siteId), eq(sitePhotos.merchantId, access.membership.merchantId))).limit(1);
+    if (!photo) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+    await db.update(sitePhotos).set({ isCover: false, updatedAt: new Date() }).where(eq(sitePhotos.siteId, siteId));
+    await db.update(sitePhotos).set({ isCover: true, updatedAt: new Date() }).where(eq(sitePhotos.id, photoId));
+  }
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "photos", "Cover photo updated."));
+}
+
+export async function deleteVenuePhoto(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const courtId = String(formData.get("courtId") ?? "");
+  const photoId = String(formData.get("photoId") ?? "");
+  const { access } = await requireOwnedSite("manage_courts", siteId);
+  if (!UUID.test(photoId)) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+  const db = getDb();
+  let pathname = "";
+  let wasCover = false;
+  if (courtId) {
+    const [photo] = await db.select({ pathname: courtPhotos.pathname, isCover: courtPhotos.isCover }).from(courtPhotos).innerJoin(courts, eq(courts.id, courtPhotos.courtId)).where(and(eq(courtPhotos.id, photoId), eq(courtPhotos.courtId, courtId), eq(courts.siteId, siteId), eq(courtPhotos.merchantId, access.membership.merchantId))).limit(1);
+    if (!photo) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+    ({ pathname, isCover: wasCover } = photo);
+    await db.delete(courtPhotos).where(eq(courtPhotos.id, photoId));
+    if (wasCover) {
+      const [next] = await db.select({ id: courtPhotos.id }).from(courtPhotos).where(eq(courtPhotos.courtId, courtId)).orderBy(asc(courtPhotos.sortOrder)).limit(1);
+      if (next) await db.update(courtPhotos).set({ isCover: true }).where(eq(courtPhotos.id, next.id));
+    }
+  } else {
+    const [photo] = await db.select({ pathname: sitePhotos.pathname, isCover: sitePhotos.isCover }).from(sitePhotos).where(and(eq(sitePhotos.id, photoId), eq(sitePhotos.siteId, siteId), eq(sitePhotos.merchantId, access.membership.merchantId))).limit(1);
+    if (!photo) redirect(previewUrl(siteId, "photos", "Photo not found.", true));
+    ({ pathname, isCover: wasCover } = photo);
+    await db.delete(sitePhotos).where(eq(sitePhotos.id, photoId));
+    if (wasCover) {
+      const [next] = await db.select({ id: sitePhotos.id }).from(sitePhotos).where(eq(sitePhotos.siteId, siteId)).orderBy(asc(sitePhotos.sortOrder)).limit(1);
+      if (next) await db.update(sitePhotos).set({ isCover: true }).where(eq(sitePhotos.id, next.id));
+    }
+  }
+  await del(pathname).catch((error) => console.error("Venue photo blob cleanup failed", error));
+  await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "venue_photo.deleted", targetType: courtId ? "court" : "site", targetId: courtId || siteId, before: { pathname } });
+  revalidatePath("/merchant/preview/sites");
+  redirect(previewUrl(siteId, "photos", "Photo deleted."));
+}
