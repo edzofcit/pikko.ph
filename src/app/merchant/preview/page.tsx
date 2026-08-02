@@ -61,7 +61,7 @@ export default async function MerchantPreviewOverview({
   const [{ today, currentTime }] = await db
     .select({
       today: sql<string>`to_char(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD')`,
-      currentTime: sql<Date>`CURRENT_TIMESTAMP`,
+      currentTime: sql<string>`CURRENT_TIMESTAMP`,
     })
     .from(merchants)
     .where(eq(merchants.id, access.membership.merchantId))
@@ -123,10 +123,10 @@ export default async function MerchantPreviewOverview({
   const paidRevenue = bookingList
     .filter((booking) => booking.paymentStatus === "paid")
     .reduce((sum, booking) => sum + booking.totalCents, 0);
-  const upcomingCount = bookingList.filter((booking) => booking.startsAt > currentTime).length;
+  const nowMs = new Date(currentTime).getTime();
+  const upcomingCount = bookingList.filter((booking) => new Date(booking.startsAt).getTime() > nowMs).length;
   const pendingBookings = bookingList.filter((booking) => booking.paymentStatus === "pending" || booking.paymentStatus === "unpaid");
 
-  const nowMs = currentTime.getTime();
   const courtCards = availabilities.flatMap((availability) =>
     availability.courts.map((court) => {
       const usable = court.schedule.filter((slot) => ["available", "booked", "held"].includes(slot.state));
@@ -249,7 +249,7 @@ export default async function MerchantPreviewOverview({
             <div className="divide-y divide-[var(--line)]">
               {bookingList.slice(0, 8).map((booking) => (
                 <Link key={booking.id} href={`/merchant/bookings/${booking.id}`} className="grid gap-2 px-5 py-4 text-sm hover:bg-[var(--cream)] sm:grid-cols-[0.8fr_1.1fr_1fr_1fr_0.6fr] sm:items-center">
-                  <span className="font-mono text-xs font-black text-[var(--forest)]">{booking.reference}</span><span><strong className="block">{booking.customerName ?? "Guest"}</strong><small className="text-[var(--text-muted)]">{booking.siteName} · {booking.courtName}</small></span><span className="text-xs">{new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(booking.startsAt)}</span><span className="flex gap-1"><small className="rounded-full bg-emerald-100 px-2 py-1 font-bold capitalize">{booking.paymentStatus.replaceAll("_", " ")}</small><small className="rounded-full bg-slate-100 px-2 py-1 font-bold capitalize">{booking.status.replaceAll("_", " ")}</small></span><strong className="sm:text-right">{formatPeso(booking.totalCents)}</strong>
+                  <span className="font-mono text-xs font-black text-[var(--forest)]">{booking.reference}</span><span><strong className="block">{booking.customerName ?? "Guest"}</strong><small className="text-[var(--text-muted)]">{booking.siteName} · {booking.courtName}</small></span><span className="text-xs">{new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(booking.startsAt))}</span><span className="flex gap-1"><small className="rounded-full bg-emerald-100 px-2 py-1 font-bold capitalize">{booking.paymentStatus.replaceAll("_", " ")}</small><small className="rounded-full bg-slate-100 px-2 py-1 font-bold capitalize">{booking.status.replaceAll("_", " ")}</small></span><strong className="sm:text-right">{formatPeso(booking.totalCents)}</strong>
                 </Link>
               ))}
               {!bookingList.length ? <p className="px-5 py-10 text-center text-sm text-[var(--text-muted)]">No bookings yet today.</p> : null}
