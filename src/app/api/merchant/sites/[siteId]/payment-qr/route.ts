@@ -90,7 +90,10 @@ export async function POST(
 
   const provider = String(formData.get("provider") ?? "");
   const operation = String(formData.get("operation") ?? "upload");
-  if (!isManualPaymentProvider(provider) || !["upload", "remove"].includes(operation)) {
+  if (
+    !isManualPaymentProvider(provider) ||
+    !["upload", "remove", "toggle"].includes(operation)
+  ) {
     return NextResponse.redirect(
       venuesUrl(request, "error", "Choose a supported payment option."),
       303,
@@ -123,6 +126,38 @@ export async function POST(
   const providerLabel =
     MANUAL_PAYMENT_PROVIDERS.find((option) => option.id === provider)?.label ??
     provider.toUpperCase();
+
+  if (operation === "toggle") {
+    if (!existingOption) {
+      return NextResponse.redirect(
+        venuesUrl(request, "error", `Upload a ${providerLabel} QR before enabling it.`),
+        303,
+      );
+    }
+    const enabled = formData.get("enabled") === "true";
+    await db
+      .update(sites)
+      .set({
+        manualPaymentOptions: existingOptions.map((option) =>
+          option.provider === provider ? { ...option, enabled } : option,
+        ),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sites.id, siteId),
+          eq(sites.merchantId, access.membership.merchantId),
+        ),
+      );
+    return NextResponse.redirect(
+      venuesUrl(
+        request,
+        "success",
+        `${providerLabel} is now ${enabled ? "visible" : "hidden"} at checkout.`,
+      ),
+      303,
+    );
+  }
 
   if (operation === "remove") {
     await db
@@ -182,7 +217,7 @@ export async function POST(
   let uploaded: Awaited<ReturnType<typeof put>> | null = null;
   try {
     uploaded = await put(pathname, image, {
-      access: "public",
+      access: "private",
       addRandomSuffix: false,
       contentType: image.type,
       cacheControlMaxAge: 31_536_000,
@@ -193,7 +228,8 @@ export async function POST(
     nextOptions.push({
       provider,
       label: providerLabel,
-      qrImageUrl: uploaded.url,
+      enabled: existingOption?.enabled ?? true,
+      qrImageUrl: `/api/sites/${siteId}/payment-qr/${provider}?v=${encodeURIComponent(uploaded.pathname)}`,
       qrImagePathname: uploaded.pathname,
     });
     await db

@@ -11,6 +11,7 @@ export type ManualPaymentProvider =
 export type ManualPaymentOption = {
   provider: ManualPaymentProvider;
   label: string;
+  enabled: boolean;
   qrImageUrl: string;
   qrImagePathname: string;
 };
@@ -36,12 +37,13 @@ export function normalizeManualPaymentOptions(
     const option = candidate as Record<string, unknown>;
     const provider = String(option.provider ?? "");
     const label = String(option.label ?? "").trim();
+    const enabled = option.enabled !== false;
     const qrImageUrl = String(option.qrImageUrl ?? "").trim();
     const qrImagePathname = String(option.qrImagePathname ?? "").trim();
     if (
       !isManualPaymentProvider(provider) ||
       !label ||
-      !qrImageUrl.startsWith("https://") ||
+      !(qrImageUrl.startsWith("https://") || qrImageUrl.startsWith("/api/")) ||
       !qrImagePathname
     ) {
       continue;
@@ -49,6 +51,7 @@ export function normalizeManualPaymentOptions(
     options.set(provider, {
       provider,
       label: label.slice(0, 40),
+      enabled,
       qrImageUrl,
       qrImagePathname,
     });
@@ -58,4 +61,8 @@ export function normalizeManualPaymentOptions(
     const option = options.get(provider.id);
     return option ? [option] : [];
   });
+}
+
+export function enabledManualPaymentOptions(value: unknown) {
+  return normalizeManualPaymentOptions(value).filter((option) => option.enabled);
 }

@@ -23,7 +23,7 @@ import {
   sites,
 } from "@/db/schema";
 import type { ManualPaymentOption } from "@/lib/manual-payment/options";
-import { normalizeManualPaymentOptions } from "@/lib/manual-payment/options";
+import { enabledManualPaymentOptions } from "@/lib/manual-payment/options";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -343,7 +343,7 @@ export async function getSiteAvailability(
         manualReservationMode: venue.manualReservationMode,
         manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
         manualPaymentInstructions: venue.manualPaymentInstructions,
-        manualPaymentOptions: normalizeManualPaymentOptions(
+        manualPaymentOptions: enabledManualPaymentOptions(
           venue.manualPaymentOptions,
         ),
       },
@@ -565,7 +565,7 @@ export async function getSiteAvailability(
       manualReservationMode: venue.manualReservationMode,
       manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
       manualPaymentInstructions: venue.manualPaymentInstructions,
-      manualPaymentOptions: normalizeManualPaymentOptions(
+      manualPaymentOptions: enabledManualPaymentOptions(
         venue.manualPaymentOptions,
       ),
     },

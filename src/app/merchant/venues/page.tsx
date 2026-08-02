@@ -320,8 +320,12 @@ export default async function MerchantVenuesPage({
                           <div key={provider.id} className="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-black">{provider.label}</p>
-                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${currentOption ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
-                                {currentOption ? "Visible" : "Not set"}
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${currentOption?.enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                                {currentOption
+                                  ? currentOption.enabled
+                                    ? "Visible"
+                                    : "Disabled"
+                                  : "Not set"}
                               </span>
                             </div>
                             {currentOption ? (
@@ -333,6 +337,28 @@ export default async function MerchantVenuesPage({
                                 sizes="240px"
                                 className="mt-3 aspect-square w-full rounded-lg border border-[var(--line)] bg-white object-contain"
                               />
+                            ) : null}
+                            {currentOption ? (
+                              <form
+                                action={`/api/merchant/sites/${site.id}/payment-qr`}
+                                method="post"
+                                className="mt-3"
+                              >
+                                <input type="hidden" name="provider" value={provider.id} />
+                                <input type="hidden" name="operation" value="toggle" />
+                                <input type="hidden" name="enabled" value={currentOption.enabled ? "false" : "true"} />
+                                <button
+                                  type="submit"
+                                  role="switch"
+                                  aria-checked={currentOption.enabled}
+                                  className="flex w-full items-center justify-between rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-black"
+                                >
+                                  <span>Show at checkout</span>
+                                  <span className={`relative h-6 w-11 rounded-full transition ${currentOption.enabled ? "bg-[var(--forest)]" : "bg-slate-300"}`} aria-hidden="true">
+                                    <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${currentOption.enabled ? "left-6" : "left-1"}`} />
+                                  </span>
+                                </button>
+                              </form>
                             ) : null}
                             <form
                               action={`/api/merchant/sites/${site.id}/payment-qr`}
