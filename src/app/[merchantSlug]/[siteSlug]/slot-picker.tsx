@@ -75,7 +75,14 @@ export function SlotPicker({
     <>
       <div className="space-y-5">
         {courts.map((court) => (
-          <article key={court.id} className="rounded-3xl border border-[var(--line)] bg-white p-5 sm:p-6">
+          <article
+            key={court.id}
+            className={`rounded-3xl border bg-white p-5 transition sm:p-6 ${
+              selection?.courtId === court.id
+                ? "border-[var(--forest)] shadow-[0_16px_40px_rgb(23_60_42_/_10%)]"
+                : "border-[var(--line)]"
+            }`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black">{court.name}</h2>
@@ -83,9 +90,14 @@ export function SlotPicker({
                   {court.indoor ? "Indoor" : "Outdoor"}{court.surfaceType ? ` · ${court.surfaceType}` : ""}
                 </p>
               </div>
-              <span className="text-sm font-black text-[var(--forest)]">
-                From {formatPeso(court.baseHourlyRateCents)}/hour
-              </span>
+              <div className="text-right">
+                <span className="block text-sm font-black text-[var(--forest)]">
+                  From {formatPeso(court.baseHourlyRateCents)}/hour
+                </span>
+                <span className="mt-1 block text-xs font-bold text-[var(--text-muted)]">
+                  {court.slots.length} open {court.slots.length === 1 ? "time" : "times"}
+                </span>
+              </div>
             </div>
 
             {court.slots.length > 0 ? (
@@ -130,14 +142,18 @@ export function SlotPicker({
               {summary.court.name} · {summary.slots.length} {summary.slots.length === 1 ? "hour" : "hours"}
             </p>
             <p className="mt-1 text-sm text-white/75">
-              {summary.slots.map((slot) => slot.label).join(", ")} · {formatPeso(summary.totalCents)}
+              {summary.slots[0]?.label}–{new Intl.DateTimeFormat("en-PH", {
+                timeZone: "Asia/Manila",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(new Date(summary.slots.at(-1)?.endsAt ?? ""))} · {formatPeso(summary.totalCents)}
             </p>
           </div>
           <Link
             href={summary.href}
             className="mt-4 inline-flex w-full justify-center rounded-full bg-[var(--lime)] px-6 py-3 text-sm font-black text-[var(--ink)] sm:mt-0 sm:w-auto"
           >
-            Review selection
+            Continue to details
           </Link>
         </aside>
       ) : null}

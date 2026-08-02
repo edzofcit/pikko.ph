@@ -79,10 +79,18 @@ export default async function CheckoutReviewPage({
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-5xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_22rem]">
+      <div className="mx-auto max-w-5xl px-5 pt-8 sm:px-8">
+        <ol className="grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black">
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Choose time</li>
+          <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">2 · Your details</li>
+          <li className="px-3 py-3 text-center text-[var(--text-muted)]">3 · Payment</li>
+        </ol>
+      </div>
+
+      <section className="mx-auto grid max-w-5xl gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_22rem]">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--coral)]">Server-verified quote</p>
-          <h1 className="display-type mt-3 text-5xl font-black">Review your court time.</h1>
+          <h1 className="display-type mt-3 text-5xl font-black">Confirm your booking.</h1>
           <div className="mt-8 rounded-3xl border border-[var(--line)] bg-white p-6">
             <p className="text-sm font-bold text-[var(--text-muted)]">{availability.merchant.name} · {availability.site.name}</p>
             <h2 className="mt-2 text-2xl font-black">{court.name}</h2>

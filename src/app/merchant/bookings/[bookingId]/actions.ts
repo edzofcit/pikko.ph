@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import {
+  auditEvents,
   bookingItems,
   bookings,
   manualPaymentProofs,
@@ -242,4 +243,87 @@ export async function rejectManualPaymentProof(formData: FormData) {
   revalidatePath("/merchant");
   revalidatePath(`/merchant/bookings/${bookingId}`);
   redirect(reviewUrl(bookingId, "success", "Payment proof rejected. The customer can upload another screenshot."));
+}
+
+export async function markStaffBookingPaid(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "");
+  if (!UUID_PATTERN.test(bookingId)) {
+    redirect("/merchant");
+  }
+
+  const access = await requireMerchantPermission("verify_payments");
+  const db = getDb();
+  const [booking] = await db
+    .select({
+      id: bookings.id,
+      merchantId: bookings.merchantId,
+      siteId: bookings.siteId,
+      source: bookings.source,
+      paymentStatus: bookings.paymentStatus,
+      paymentId: payments.id,
+      provider: payments.provider,
+    })
+    .from(bookings)
+    .innerJoin(payments, eq(payments.bookingId, bookings.id))
+    .where(
+      and(
+        eq(bookings.id, bookingId),
+        eq(bookings.merchantId, access.membership.merchantId),
+      ),
+    )
+    .limit(1);
+
+  if (
+    !booking ||
+    !access.sites.some((site) => site.id === booking.siteId) ||
+    !booking.source.startsWith("merchant_") ||
+    booking.provider !== "none" ||
+    booking.paymentStatus !== "unpaid"
+  ) {
+    redirect(
+      reviewUrl(bookingId, "error", "This booking cannot be marked as paid."),
+    );
+  }
+
+  const now = new Date();
+  const result = await db.execute(sql`
+    with paid_booking as (
+      update bookings
+      set payment_status = 'paid', updated_at = ${now}
+      where id = ${booking.id}
+        and merchant_id = ${booking.merchantId}
+        and payment_status = 'unpaid'
+      returning id
+    )
+    update payments
+    set status = 'paid',
+        method = 'cash',
+        paid_at = ${now},
+        updated_at = ${now}
+    from paid_booking
+    where payments.id = ${booking.paymentId}
+      and payments.provider = 'none'
+    returning payments.id
+  `);
+
+  if (!result.rows.length) {
+    redirect(
+      reviewUrl(bookingId, "error", "This payment was already processed."),
+    );
+  }
+
+  await db.insert(auditEvents).values({
+    merchantId: booking.merchantId,
+    actorUserId: access.user.id,
+    action: "merchant.booking.cash_payment_recorded",
+    targetType: "booking",
+    targetId: booking.id,
+    before: { paymentStatus: "unpaid" },
+    after: { paymentStatus: "paid", method: "cash" },
+  });
+
+  revalidatePath("/merchant");
+  revalidatePath("/merchant/schedule");
+  revalidatePath(`/merchant/bookings/${bookingId}`);
+  redirect(reviewUrl(bookingId, "success", "Cash payment recorded."));
 }

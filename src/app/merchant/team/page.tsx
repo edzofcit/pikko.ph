@@ -78,7 +78,15 @@ export default async function MerchantTeamPage({
       eyebrow={`Team access · ${access.membership.merchantName}`}
       title="Invite staff with the right access."
       description="Roles control permitted actions. Site assignments limit non-owner staff to the venues they operate."
-      navigation={[{ href: "/merchant", label: "Dashboard" }]}
+      navigation={[
+        { href: "/merchant", label: "Dashboard" },
+        ...(access.permissions.includes("manage_bookings")
+          ? [{ href: "/merchant/schedule", label: "Schedule" }]
+          : []),
+        ...(access.permissions.includes("manage_courts")
+          ? [{ href: "/merchant/venues", label: "Sites & courts" }]
+          : []),
+      ]}
       metrics={[
         { label: "Team members", value: String(staff.length), note: "Active and invited" },
         { label: "Owners", value: String(staff.filter((member) => member.role === "owner").length), note: "Full merchant access" },

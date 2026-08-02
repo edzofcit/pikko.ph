@@ -16,7 +16,11 @@ import {
 } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatPeso } from "@/lib/money";
-import { approveManualPaymentProof, rejectManualPaymentProof } from "./actions";
+import {
+  approveManualPaymentProof,
+  markStaffBookingPaid,
+  rejectManualPaymentProof,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Review booking" };
 export const dynamic = "force-dynamic";
@@ -48,12 +52,14 @@ export default async function MerchantBookingPage({
       merchantId: bookings.merchantId,
       siteId: bookings.siteId,
       reference: bookings.reference,
+      source: bookings.source,
       status: bookings.status,
       paymentStatus: bookings.paymentStatus,
       customerName: bookings.customerName,
       customerEmail: bookings.customerEmail,
       customerMobileNumber: bookings.customerMobileNumber,
       customerNotes: bookings.customerNotes,
+      internalNotes: bookings.internalNotes,
       totalCents: bookings.totalCents,
       createdAt: bookings.createdAt,
       paymentDueAt: bookings.paymentDueAt,
@@ -62,6 +68,7 @@ export default async function MerchantBookingPage({
       timezone: sites.timezone,
       paymentId: payments.id,
       provider: payments.provider,
+      paymentMethod: payments.method,
     })
     .from(bookings)
     .innerJoin(sites, eq(sites.id, bookings.siteId))
@@ -115,18 +122,25 @@ export default async function MerchantBookingPage({
 
   return (
     <DashboardShell
-      eyebrow={`Payment review · ${booking.siteName}`}
+      eyebrow={`${booking.provider === "manual" ? "Payment review" : "Staff booking"} · ${booking.siteName}`}
       title={`Booking ${booking.reference}`}
-      description="Review the customer's payment screenshot before confirming the court reservation."
+      description={
+        booking.provider === "manual"
+          ? "Review the customer's payment screenshot before confirming the court reservation."
+          : "Review the customer, payment, and reserved court time for this staff-created booking."
+      }
       navigation={[
         { href: "/merchant", label: "Dashboard" },
+        { href: "/merchant/schedule", label: "Schedule" },
         { href: "/customer", label: "Customer mode" },
       ]}
       metrics={[
         { label: "Booking status", value: booking.status.replaceAll("_", " "), note: `Created ${formatDateTime(booking.createdAt, booking.timezone)}` },
         { label: "Payment", value: booking.paymentStatus.replaceAll("_", " "), note: booking.provider === "manual" ? "Manual payment" : booking.provider },
         { label: "Amount", value: formatPeso(booking.totalCents), note: `${items.length} hour block${items.length === 1 ? "" : "s"}` },
-        { label: "Proofs", value: String(proofs.length), note: `${proofs.filter((proof) => proof.status === "submitted").length} awaiting review` },
+        booking.provider === "manual"
+          ? { label: "Proofs", value: String(proofs.length), note: `${proofs.filter((proof) => proof.status === "submitted").length} awaiting review` }
+          : { label: "Source", value: booking.source.replace("merchant_", "").replaceAll("_", " "), note: booking.paymentMethod.replaceAll("_", " ") },
       ]}
     >
       {query.success || query.error ? (
@@ -144,6 +158,7 @@ export default async function MerchantBookingPage({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
+          {booking.provider === "manual" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-6">
             <h2 className="text-lg font-black">Payment screenshots</h2>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
@@ -229,6 +244,39 @@ export default async function MerchantBookingPage({
               ) : null}
             </div>
           </section>
+          ) : (
+            <section className="rounded-2xl border border-[var(--line)] bg-white p-6">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">Staff-created reservation</p>
+              <h2 className="mt-2 text-xl font-black">Booking record</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                This booking was created from the merchant workspace and reserved the selected court immediately.
+              </p>
+              <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-[var(--paper)] p-4">
+                  <dt className="text-xs font-bold text-[var(--text-muted)]">Source</dt>
+                  <dd className="mt-1 font-black capitalize">{booking.source.replace("merchant_", "").replaceAll("_", " ")}</dd>
+                </div>
+                <div className="rounded-xl bg-[var(--paper)] p-4">
+                  <dt className="text-xs font-bold text-[var(--text-muted)]">Payment method</dt>
+                  <dd className="mt-1 font-black capitalize">{booking.paymentMethod.replaceAll("_", " ")}</dd>
+                </div>
+              </dl>
+              {booking.internalNotes ? (
+                <div className="mt-5 rounded-xl border border-[var(--line)] p-4">
+                  <p className="text-xs font-bold text-[var(--text-muted)]">Internal notes</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm">{booking.internalNotes}</p>
+                </div>
+              ) : null}
+              {booking.paymentStatus === "unpaid" && canVerifyPayment ? (
+                <form action={markStaffBookingPaid} className="mt-5 border-t border-[var(--line)] pt-5">
+                  <input type="hidden" name="bookingId" value={booking.id} />
+                  <button className="w-full rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white sm:w-auto">
+                    Record cash payment
+                  </button>
+                </form>
+              ) : null}
+            </section>
+          )}
         </div>
 
         <aside className="h-fit space-y-6">
@@ -236,8 +284,8 @@ export default async function MerchantBookingPage({
             <h2 className="font-black">Customer</h2>
             <dl className="mt-4 space-y-3 text-sm">
               <div><dt className="text-[var(--text-muted)]">Name</dt><dd className="mt-1 font-bold">{booking.customerName}</dd></div>
-              <div><dt className="text-[var(--text-muted)]">Email</dt><dd className="mt-1 break-all font-bold">{booking.customerEmail}</dd></div>
-              <div><dt className="text-[var(--text-muted)]">Mobile</dt><dd className="mt-1 font-bold">{booking.customerMobileNumber}</dd></div>
+              <div><dt className="text-[var(--text-muted)]">Email</dt><dd className="mt-1 break-all font-bold">{booking.customerEmail ?? "Not provided"}</dd></div>
+              <div><dt className="text-[var(--text-muted)]">Mobile</dt><dd className="mt-1 font-bold">{booking.customerMobileNumber ?? "Not provided"}</dd></div>
             </dl>
             {booking.customerNotes ? <p className="mt-4 rounded-xl bg-[var(--paper)] p-3 text-sm">{booking.customerNotes}</p> : null}
           </section>
@@ -251,8 +299,8 @@ export default async function MerchantBookingPage({
                 </div>
               ))}
             </div>
-            <Link href="/merchant" className="mt-5 inline-flex text-sm font-black text-[var(--forest)]">
-              ← Back to bookings
+            <Link href="/merchant/schedule" className="mt-5 inline-flex text-sm font-black text-[var(--forest)]">
+              ← Back to schedule
             </Link>
           </section>
         </aside>

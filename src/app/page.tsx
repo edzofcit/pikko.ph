@@ -12,8 +12,66 @@ const steps = [
   ["03", "Pay and play", "Confirm securely with Maya QR Ph or merchant payment instructions."],
 ];
 
-export default async function Home() {
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string;
+    city?: string;
+    courtType?: string;
+    date?: string;
+  }>;
+}) {
+  const query = await searchParams;
   const marketplaceSites = await getMarketplaceSites();
+  const searchTerm = (query.q ?? "").trim().toLowerCase();
+  const cityFilter = (query.city ?? "").trim();
+  const courtType =
+    query.courtType === "indoor" || query.courtType === "outdoor"
+      ? query.courtType
+      : "any";
+  const bookingDate = DATE_PATTERN.test(query.date ?? "")
+    ? query.date
+    : undefined;
+  const cities = Array.from(
+    new Set(marketplaceSites.map((site) => site.city)),
+  ).sort((left, right) => left.localeCompare(right));
+  const hasFilters = Boolean(
+    searchTerm || cityFilter || courtType !== "any" || bookingDate,
+  );
+  const filteredSites = marketplaceSites.filter((site) => {
+    if (cityFilter && site.city !== cityFilter) return false;
+    if (
+      courtType === "indoor" &&
+      !site.courts.some((court) => court.indoor)
+    ) {
+      return false;
+    }
+    if (
+      courtType === "outdoor" &&
+      !site.courts.some((court) => !court.indoor)
+    ) {
+      return false;
+    }
+    if (!searchTerm) return true;
+
+    const searchable = [
+      site.name,
+      site.merchantName,
+      site.city,
+      site.province ?? "",
+      ...site.amenities,
+      ...site.courts.flatMap((court) => [
+        court.name,
+        court.surfaceType ?? "",
+      ]),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return searchable.includes(searchTerm);
+  });
   const featuredSite = marketplaceSites[0];
   const featuredCourt = featuredSite?.courts.reduce((lowest, court) =>
     court.hourlyRateCents < lowest.hourlyRateCents ? court : lowest,
@@ -160,7 +218,72 @@ export default async function Home() {
               Browse active venues already on Pikko.ph. Each card links to real court schedules, current hourly prices, and server-checked availability.
             </p>
           </div>
-          <MarketplaceCourtGrid sites={marketplaceSites} />
+          <form
+            action="/#courts"
+            className="mb-7 grid gap-3 rounded-[1.75rem] border border-[var(--line)] bg-white p-4 shadow-[0_14px_40px_rgb(23_34_26_/_6%)] md:grid-cols-[1.3fr_0.8fr_0.7fr_0.8fr_auto] md:items-end"
+          >
+            <label className="text-xs font-black text-[var(--forest)]">
+              Search courts
+              <input
+                name="q"
+                defaultValue={query.q ?? ""}
+                placeholder="Venue, city, surface…"
+                className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal"
+              />
+            </label>
+            <label className="text-xs font-black text-[var(--forest)]">
+              City
+              <select
+                name="city"
+                defaultValue={cityFilter}
+                className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal"
+              >
+                <option value="">All cities</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-black text-[var(--forest)]">
+              Court type
+              <select
+                name="courtType"
+                defaultValue={courtType}
+                className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal"
+              >
+                <option value="any">Any</option>
+                <option value="indoor">Indoor</option>
+                <option value="outdoor">Outdoor</option>
+              </select>
+            </label>
+            <label className="text-xs font-black text-[var(--forest)]">
+              Playing date
+              <input
+                name="date"
+                type="date"
+                defaultValue={bookingDate}
+                className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal"
+              />
+            </label>
+            <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
+              Find courts
+            </button>
+          </form>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="font-bold text-[var(--forest)]">
+              {filteredSites.length} {filteredSites.length === 1 ? "venue" : "venues"} found
+            </p>
+            {hasFilters ? (
+              <Link href="/#courts" className="text-xs font-black text-[var(--forest)] underline underline-offset-4">
+                Clear all filters
+              </Link>
+            ) : null}
+          </div>
+          <MarketplaceCourtGrid
+            sites={filteredSites}
+            date={bookingDate}
+            filtered={hasFilters}
+          />
         </div>
       </section>
 

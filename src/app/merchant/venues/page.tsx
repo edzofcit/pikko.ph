@@ -96,6 +96,9 @@ export default async function MerchantVenuesPage({
       description="Create each physical venue as a site, then add its courts and standard hourly rates. Courts inherit the site's operating hours until you add an override."
       navigation={[
         { href: "/merchant", label: "Dashboard" },
+        ...(access.permissions.includes("manage_bookings")
+          ? [{ href: "/merchant/schedule", label: "Schedule" }]
+          : []),
         ...(access.permissions.includes("manage_staff")
           ? [{ href: "/merchant/team", label: "Team" }]
           : []),

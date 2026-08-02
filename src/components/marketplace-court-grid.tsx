@@ -2,19 +2,31 @@ import Link from "next/link";
 import type { MarketplaceSite } from "@/lib/marketplace/courts";
 import { formatPeso } from "@/lib/money";
 
-export function MarketplaceCourtGrid({ sites }: { sites: MarketplaceSite[] }) {
+export function MarketplaceCourtGrid({
+  sites,
+  date,
+  filtered = false,
+}: {
+  sites: MarketplaceSite[];
+  date?: string;
+  filtered?: boolean;
+}) {
   if (sites.length === 0) {
     return (
       <div className="rounded-[2rem] border border-dashed border-[var(--line)] bg-white/70 px-6 py-14 text-center">
-        <p className="text-lg font-black">Marketplace courts are coming soon.</p>
+        <p className="text-lg font-black">
+          {filtered ? "No courts match those filters." : "Marketplace courts are coming soon."}
+        </p>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Active merchant sites with bookable courts will appear here automatically.
+          {filtered
+            ? "Try another city, court type, or a broader search."
+            : "Active merchant sites with bookable courts will appear here automatically."}
         </p>
         <Link
-          href="/merchant"
+          href={filtered ? "/#courts" : "/merchant"}
           className="mt-6 inline-flex rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white"
         >
-          List your venue
+          {filtered ? "Clear filters" : "List your venue"}
         </Link>
       </div>
     );
@@ -29,7 +41,7 @@ export function MarketplaceCourtGrid({ sites }: { sites: MarketplaceSite[] }) {
         return (
           <Link
             key={site.id}
-            href={`/${site.merchantSlug}/${site.slug}`}
+            href={`/${site.merchantSlug}/${site.slug}${date ? `?date=${date}` : ""}`}
             className="group flex min-h-80 flex-col rounded-[1.75rem] border border-[var(--line)] bg-white p-6 shadow-[0_18px_55px_rgb(23_34_26_/_7%)] transition hover:-translate-y-1 hover:border-[var(--forest)]"
           >
             <div className="flex items-start justify-between gap-4">

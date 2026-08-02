@@ -95,6 +95,7 @@ export default async function CustomerPage() {
           bookingId: bookingItems.bookingId,
           startsAt: bookingItems.startsAt,
           courtName: courts.name,
+          isUpcoming: sql<boolean>`${bookingItems.startsAt} >= CURRENT_TIMESTAMP`,
         })
         .from(bookingItems)
         .innerJoin(courts, eq(courts.id, bookingItems.courtId))
@@ -103,7 +104,7 @@ export default async function CustomerPage() {
     : [];
   const scheduleByBooking = new Map<
     string,
-    { startsAt: Date; courtName: string; slotCount: number }
+    { startsAt: Date; courtName: string; slotCount: number; isUpcoming: boolean }
   >();
 
   for (const item of items) {
@@ -115,6 +116,7 @@ export default async function CustomerPage() {
         startsAt: item.startsAt,
         courtName: item.courtName,
         slotCount: 1,
+        isUpcoming: item.isUpcoming,
       });
     }
   }
@@ -124,6 +126,29 @@ export default async function CustomerPage() {
       booking.status === "pending_payment" ||
       booking.status === "pending_verification",
   ).length;
+  const actionBookings = customerBookings.filter(
+    (booking) =>
+      booking.status === "pending_payment" ||
+      booking.status === "pending_verification",
+  );
+  const nextBooking = customerBookings
+    .filter((booking) => {
+      const schedule = scheduleByBooking.get(booking.id);
+      return (
+        schedule &&
+        schedule.isUpcoming &&
+        booking.status !== "cancelled" &&
+        booking.status !== "expired"
+      );
+    })
+    .sort((left, right) => {
+      const leftStart = scheduleByBooking.get(left.id)?.startsAt.getTime() ?? 0;
+      const rightStart = scheduleByBooking.get(right.id)?.startsAt.getTime() ?? 0;
+      return leftStart - rightStart;
+    })[0];
+  const nextSchedule = nextBooking
+    ? scheduleByBooking.get(nextBooking.id)
+    : undefined;
 
   return (
     <main className="min-h-screen">
@@ -160,11 +185,11 @@ export default async function CustomerPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--coral)]">
               Customer account
             </p>
-            <h1 className="display-type mt-3 text-5xl font-black sm:text-7xl">
+            <h1 className="display-type mt-3 text-5xl font-black sm:text-6xl">
               Hi, {user.fullName}.
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-[var(--text-muted)]">
-              Review bookings made while signed in, plus guest bookings associated with your verified email.
+              Your upcoming games, payments, and booking history in one place.
             </p>
           </div>
           <Link
@@ -197,6 +222,70 @@ export default async function CustomerPage() {
             Verify your email to also claim earlier guest bookings made with this address.
           </p>
         ) : null}
+
+        <div className="mt-7 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+          <section className="overflow-hidden rounded-3xl bg-[var(--forest)] p-6 text-white sm:p-7">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--lime)]">Next game</p>
+            {nextBooking && nextSchedule ? (
+              <div className="mt-4">
+                <p className="text-2xl font-black sm:text-3xl">{nextSchedule.courtName}</p>
+                <p className="mt-2 text-sm text-white/70">
+                  {nextBooking.merchantName} · {nextBooking.siteName}
+                </p>
+                <p className="mt-5 text-lg font-black">
+                  {formatSchedule(nextSchedule.startsAt, nextBooking.timezone)}
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                  <span className="rounded-full bg-white/10 px-3 py-2 text-xs font-black uppercase">
+                    {nextBooking.status.replaceAll("_", " ")}
+                  </span>
+                  <Link
+                    href={`/booking/${nextBooking.reference}`}
+                    className="rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]"
+                  >
+                    View booking
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="text-2xl font-black">Ready for your next game?</p>
+                <p className="mt-2 text-sm leading-6 text-white/70">Find an open court and get a confirmed schedule on your calendar.</p>
+                <Link href="/#courts" className="mt-6 inline-flex rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]">
+                  Find a court
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className={`rounded-3xl border p-6 sm:p-7 ${actionBookings.length ? "border-amber-200 bg-amber-50" : "border-[var(--line)] bg-white"}`}>
+            <p className={`text-xs font-black uppercase tracking-[0.16em] ${actionBookings.length ? "text-amber-800" : "text-[var(--text-muted)]"}`}>
+              Needs action
+            </p>
+            {actionBookings.length ? (
+              <div className="mt-4 space-y-3">
+                {actionBookings.slice(0, 3).map((booking) => (
+                  <Link
+                    key={booking.id}
+                    href={`/booking/${booking.reference}`}
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm"
+                  >
+                    <span>
+                      <span className="block font-black">{booking.siteName}</span>
+                      <span className="mt-1 block text-xs text-[var(--text-muted)]">{booking.paymentStatus.replaceAll("_", " ")}</span>
+                    </span>
+                    <span className="font-black text-[var(--forest)]">Continue →</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="text-xl font-black">You’re all caught up.</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">No payments or booking confirmations need your attention.</p>
+              </div>
+            )}
+          </section>
+        </div>
 
         <section className="mt-7 overflow-hidden rounded-3xl border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] px-6 py-5">
