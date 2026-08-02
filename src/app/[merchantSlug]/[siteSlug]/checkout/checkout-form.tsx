@@ -16,6 +16,7 @@ export function CheckoutForm({
   starts,
   deadlineMinutes,
   reserveImmediately,
+  customer,
 }: {
   merchantSlug: string;
   siteSlug: string;
@@ -24,6 +25,12 @@ export function CheckoutForm({
   starts: string[];
   deadlineMinutes: number;
   reserveImmediately: boolean;
+  customer: {
+    signedIn: boolean;
+    fullName: string;
+    email: string;
+    mobileNumber: string;
+  } | null;
 }) {
   const [state, formAction, pending] = useActionState(
     createManualBooking,
@@ -46,6 +53,7 @@ export function CheckoutForm({
           minLength={2}
           maxLength={160}
           autoComplete="name"
+          defaultValue={customer?.fullName}
           className="mt-2 w-full rounded-xl border border-white/20 bg-white px-4 py-3 font-normal text-[var(--ink)]"
         />
       </label>
@@ -57,6 +65,8 @@ export function CheckoutForm({
           required
           maxLength={320}
           autoComplete="email"
+          defaultValue={customer?.email}
+          readOnly={customer?.signedIn}
           className="mt-2 w-full rounded-xl border border-white/20 bg-white px-4 py-3 font-normal text-[var(--ink)]"
         />
       </label>
@@ -70,9 +80,16 @@ export function CheckoutForm({
           maxLength={40}
           autoComplete="tel"
           placeholder="09xx xxx xxxx"
+          defaultValue={customer?.mobileNumber}
           className="mt-2 w-full rounded-xl border border-white/20 bg-white px-4 py-3 font-normal text-[var(--ink)]"
         />
       </label>
+
+      {customer?.signedIn ? (
+        <p className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/80">
+          Signed in as <strong className="text-white">{customer.email}</strong>. This booking will appear in your customer account.
+        </p>
+      ) : null}
       <label className="block text-sm font-bold">
         Notes <span className="font-normal text-white/60">(optional)</span>
         <textarea

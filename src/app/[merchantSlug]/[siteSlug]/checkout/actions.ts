@@ -2,7 +2,9 @@
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, lte } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getDb } from "@/db";
 import {
   bookingAccessTokens,
@@ -12,6 +14,9 @@ import {
   payments,
 } from "@/db/schema";
 import { getSiteAvailability } from "@/lib/booking/availability";
+import { syncCurrentUser } from "@/lib/auth/access";
+import { ensureCustomerProfile } from "@/lib/customer/profile";
+import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 
 export type ManualBookingState = { error: string | null };
 
@@ -28,6 +33,35 @@ function bookingReference() {
 
 function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function bookingOrigin(requestHeaders: Headers) {
+  const configuredUrl = process.env.APP_URL?.trim();
+  if (configuredUrl) {
+    try {
+      const url = new URL(configuredUrl);
+      if (url.protocol === "https:" || url.protocol === "http:") {
+        return url.origin;
+      }
+    } catch {
+      console.warn("APP_URL is invalid; using the request origin instead.");
+    }
+  }
+
+  const forwardedHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || requestHeaders.get("host")?.trim();
+  if (host && /^[a-z0-9.-]+(?::\d+)?$/i.test(host)) {
+    const forwardedProtocol = requestHeaders
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    const protocol = forwardedProtocol === "http" ? "http" : "https";
+    return `${protocol}://${host}`;
+  }
+
+  return process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
 }
 
 function isCourtConflict(error: unknown) {
@@ -53,10 +87,13 @@ export async function createManualBooking(
     .filter(Boolean)
     .slice(0, 12)
     .sort();
-  const fullName = readText(formData, "fullName");
-  const email = readText(formData, "email").toLowerCase();
+  const submittedFullName = readText(formData, "fullName");
+  const submittedEmail = readText(formData, "email").toLowerCase();
   const mobileNumber = readText(formData, "mobileNumber");
   const customerNotes = readText(formData, "customerNotes");
+  const signedInUser = await syncCurrentUser();
+  const fullName = submittedFullName || signedInUser?.fullName || "";
+  const email = signedInUser?.email ?? submittedEmail;
 
   if (
     !merchantSlug ||
@@ -102,6 +139,22 @@ export async function createManualBooking(
   }
 
   const db = getDb();
+  let customerId: string | null = null;
+  if (signedInUser) {
+    try {
+      const customer = await ensureCustomerProfile(signedInUser, {
+        fullName,
+        mobileNumber,
+      });
+      customerId = customer.id;
+    } catch (error) {
+      console.error("Customer profile linking failed", error);
+      return {
+        error:
+          "We could not link this booking to your customer account. Verify your email or try again.",
+      };
+    }
+  }
   const now = new Date();
   const paymentDueAt = new Date(
     now.getTime() + availability.site.manualPaymentDeadlineMinutes * 60_000,
@@ -132,6 +185,13 @@ export async function createManualBooking(
   }));
   const reserveImmediately =
     availability.site.manualReservationMode === "reserve_immediately";
+  const lastBookedEnd = itemRows[itemRows.length - 1]!.endsAt;
+  const accessExpiresAt = new Date(
+    Math.max(
+      now.getTime() + 90 * 24 * 60 * 60_000,
+      lastBookedEnd.getTime() + 30 * 24 * 60 * 60_000,
+    ),
+  );
 
   const releaseExpiredAllocations = db
     .update(courtAllocations)
@@ -147,6 +207,7 @@ export async function createManualBooking(
       id: bookingId,
       merchantId: availability.merchant.id,
       siteId: availability.site.id,
+      customerId,
       reference,
       source: "customer_web",
       status: "pending_payment",
@@ -189,7 +250,7 @@ export async function createManualBooking(
       merchantId: availability.merchant.id,
       bookingId,
       tokenHash: tokenHash(accessToken),
-      expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60_000),
+      expiresAt: accessExpiresAt,
     });
   const insertAllocations = db.insert(courtAllocations).values(
     itemRows.map((item) => ({
@@ -230,7 +291,35 @@ export async function createManualBooking(
     return { error: "We could not create the booking. Please try again." };
   }
 
-  redirect(
-    `/booking/${reference}?token=${encodeURIComponent(accessToken)}`,
-  );
+  const requestHeaders = await headers();
+  const bookingPath = `/booking/${reference}?token=${encodeURIComponent(accessToken)}`;
+  const bookingUrl = new URL(bookingPath, bookingOrigin(requestHeaders)).toString();
+  if (process.env.BOOKING_EMAIL_ENABLED === "true") {
+    after(async () => {
+      try {
+        await sendBookingConfirmationEmail({
+          bookingId,
+          bookingUrl,
+          customerEmail: email,
+          customerName: fullName,
+          reference,
+          merchantName: availability.merchant.name,
+          siteName: availability.site.name,
+          courtName: court.name,
+          timezone: availability.site.timezone,
+          slots: itemRows.map((item) => ({
+            startsAt: item.startsAt,
+            endsAt: item.endsAt,
+          })),
+          totalCents: subtotalCents,
+          paymentDueAt,
+          manualPaymentInstructions: availability.site.manualPaymentInstructions,
+        });
+      } catch (error) {
+        console.error(`Booking confirmation email failed for ${reference}`, error);
+      }
+    });
+  }
+
+  redirect(bookingPath);
 }

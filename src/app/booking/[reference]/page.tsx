@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -9,12 +9,14 @@ import {
   bookingItems,
   bookings,
   courts,
+  customers,
   manualPaymentProofs,
   merchants,
   sites,
 } from "@/db/schema";
 import { formatPeso } from "@/lib/money";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
+import { syncCurrentUser } from "@/lib/auth/access";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -30,6 +32,29 @@ function formatDateTime(value: Date, timezone: string) {
   }).format(value);
 }
 
+const bookingFields = {
+  id: bookings.id,
+  merchantId: bookings.merchantId,
+  customerId: bookings.customerId,
+  reference: bookings.reference,
+  status: bookings.status,
+  paymentStatus: bookings.paymentStatus,
+  customerName: bookings.customerName,
+  customerEmail: bookings.customerEmail,
+  currency: bookings.currency,
+  subtotalCents: bookings.subtotalCents,
+  totalCents: bookings.totalCents,
+  paymentDueAt: bookings.paymentDueAt,
+  createdAt: bookings.createdAt,
+  merchantName: merchants.displayName,
+  merchantSlug: merchants.slug,
+  siteName: sites.name,
+  siteSlug: sites.slug,
+  timezone: sites.timezone,
+  manualReservationMode: sites.manualReservationMode,
+  manualPaymentInstructions: sites.manualPaymentInstructions,
+};
+
 export default async function GuestBookingPage({
   params,
   searchParams,
@@ -39,50 +64,65 @@ export default async function GuestBookingPage({
 }) {
   const [{ reference }, query] = await Promise.all([params, searchParams]);
   const token = query.token ?? "";
-  if (!token || token.length > 1000) notFound();
+  if (token.length > 1000) notFound();
 
   const db = getDb();
-  const [booking] = await db
-    .select({
-      id: bookings.id,
-      merchantId: bookings.merchantId,
-      reference: bookings.reference,
-      status: bookings.status,
-      paymentStatus: bookings.paymentStatus,
-      customerName: bookings.customerName,
-      customerEmail: bookings.customerEmail,
-      currency: bookings.currency,
-      subtotalCents: bookings.subtotalCents,
-      totalCents: bookings.totalCents,
-      paymentDueAt: bookings.paymentDueAt,
-      createdAt: bookings.createdAt,
-      merchantName: merchants.displayName,
-      merchantSlug: merchants.slug,
-      siteName: sites.name,
-      siteSlug: sites.slug,
-      timezone: sites.timezone,
-      manualReservationMode: sites.manualReservationMode,
-      manualPaymentInstructions: sites.manualPaymentInstructions,
-    })
-    .from(bookingAccessTokens)
-    .innerJoin(
-      bookings,
-      and(
-        eq(bookings.id, bookingAccessTokens.bookingId),
-        eq(bookings.merchantId, bookingAccessTokens.merchantId),
-      ),
-    )
-    .innerJoin(sites, eq(sites.id, bookings.siteId))
-    .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
-    .where(
-      and(
-        eq(bookings.reference, reference),
-        eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
-        gt(bookingAccessTokens.expiresAt, new Date()),
-        isNull(bookingAccessTokens.revokedAt),
-      ),
-    )
-    .limit(1);
+  let booking: Awaited<ReturnType<typeof loadBookingWithToken>>[number] | undefined;
+
+  async function loadBookingWithToken() {
+    return db
+      .select(bookingFields)
+      .from(bookingAccessTokens)
+      .innerJoin(
+        bookings,
+        and(
+          eq(bookings.id, bookingAccessTokens.bookingId),
+          eq(bookings.merchantId, bookingAccessTokens.merchantId),
+        ),
+      )
+      .innerJoin(sites, eq(sites.id, bookings.siteId))
+      .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
+      .where(
+        and(
+          eq(bookings.reference, reference),
+          eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
+          gt(bookingAccessTokens.expiresAt, new Date()),
+          isNull(bookingAccessTokens.revokedAt),
+        ),
+      )
+      .limit(1);
+  }
+
+  if (token) {
+    [booking] = await loadBookingWithToken();
+  } else {
+    const user = await syncCurrentUser();
+    if (!user) notFound();
+    const [customer] = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.userId, user.id))
+      .limit(1);
+    const ownership = customer
+      ? user.emailVerifiedAt
+        ? or(
+            eq(bookings.customerId, customer.id),
+            sql`lower(${bookings.customerEmail}) = ${user.email}`,
+          )
+        : eq(bookings.customerId, customer.id)
+      : user.emailVerifiedAt
+        ? sql`lower(${bookings.customerEmail}) = ${user.email}`
+        : null;
+    if (!ownership) notFound();
+
+    [booking] = await db
+      .select(bookingFields)
+      .from(bookings)
+      .innerJoin(sites, eq(sites.id, bookings.siteId))
+      .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
+      .where(and(eq(bookings.reference, reference), ownership))
+      .limit(1);
+  }
 
   if (!booking) notFound();
 
@@ -264,7 +304,7 @@ export default async function GuestBookingPage({
                   {proofs.map((proof) => (
                     <article key={proof.id} className="overflow-hidden rounded-2xl border border-[var(--line)]">
                       <Image
-                        src={`/api/payment-proofs/${proof.id}?token=${encodeURIComponent(token)}`}
+                        src={`/api/payment-proofs/${proof.id}${token ? `?token=${encodeURIComponent(token)}` : ""}`}
                         alt={`Payment proof ${proof.originalFilename}`}
                         width={1200}
                         height={800}

@@ -189,7 +189,9 @@ export async function requirePlatformAdmin() {
   const user = await syncCurrentUser();
 
   if (!user) {
-    redirect(`/auth/sign-in?callbackURL=${encodeURIComponent("/admin")}`);
+    redirect(
+      `/auth/sign-in?audience=admin&callbackURL=${encodeURIComponent("/admin")}`,
+    );
   }
 
   if (user.platformRole !== "admin") {

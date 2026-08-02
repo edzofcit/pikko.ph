@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -14,6 +14,7 @@ import {
   sites,
 } from "@/db/schema";
 import { syncCurrentUser } from "@/lib/auth/access";
+import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { formatPeso } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -52,36 +53,41 @@ export default async function CustomerPage() {
     )
     .orderBy(asc(merchantMemberships.createdAt))
     .limit(1);
-  const bookingsPromise = user.emailVerifiedAt
-    ? db
-        .select({
-          id: bookings.id,
-          reference: bookings.reference,
-          status: bookings.status,
-          paymentStatus: bookings.paymentStatus,
-          totalCents: bookings.totalCents,
-          createdAt: bookings.createdAt,
-          merchantName: merchants.displayName,
-          siteName: sites.name,
-          timezone: sites.timezone,
-        })
-        .from(bookings)
-        .innerJoin(
-          sites,
-          and(
-            eq(sites.id, bookings.siteId),
-            eq(sites.merchantId, bookings.merchantId),
-          ),
-        )
-        .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
-        .where(sql`lower(${bookings.customerEmail}) = ${user.email}`)
-        .orderBy(desc(bookings.createdAt))
-        .limit(20)
-    : Promise.resolve([]);
-  const [[membership], customerBookings] = await Promise.all([
+  const [[membership], customerProfile] = await Promise.all([
     membershipPromise,
-    bookingsPromise,
+    ensureCustomerProfile(user),
   ]);
+  const customerBookings = await db
+    .select({
+      id: bookings.id,
+      reference: bookings.reference,
+      status: bookings.status,
+      paymentStatus: bookings.paymentStatus,
+      totalCents: bookings.totalCents,
+      createdAt: bookings.createdAt,
+      merchantName: merchants.displayName,
+      siteName: sites.name,
+      timezone: sites.timezone,
+    })
+    .from(bookings)
+    .innerJoin(
+      sites,
+      and(
+        eq(sites.id, bookings.siteId),
+        eq(sites.merchantId, bookings.merchantId),
+      ),
+    )
+    .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
+    .where(
+      user.emailVerifiedAt
+        ? or(
+            eq(bookings.customerId, customerProfile.id),
+            sql`lower(${bookings.customerEmail}) = ${user.email}`,
+          )
+        : eq(bookings.customerId, customerProfile.id),
+    )
+    .orderBy(desc(bookings.createdAt))
+    .limit(20);
   const bookingIds = customerBookings.map((booking) => booking.id);
   const items = bookingIds.length
     ? await db
@@ -158,7 +164,7 @@ export default async function CustomerPage() {
               Hi, {user.fullName}.
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-[var(--text-muted)]">
-              Review bookings associated with your verified email, then jump back into the marketplace when it is time to play again.
+              Review bookings made while signed in, plus guest bookings associated with your verified email.
             </p>
           </div>
           <Link
@@ -188,7 +194,7 @@ export default async function CustomerPage() {
 
         {!user.emailVerifiedAt ? (
           <p className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-900">
-            Verify your email before Pikko.ph links bookings to this customer account.
+            Verify your email to also claim earlier guest bookings made with this address.
           </p>
         ) : null}
 
@@ -196,7 +202,7 @@ export default async function CustomerPage() {
           <div className="border-b border-[var(--line)] px-6 py-5">
             <h2 className="text-xl font-black">My recent bookings</h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Guest and signed-in bookings made with {user.email}
+              Signed-in bookings{user.emailVerifiedAt ? ` and guest bookings made with ${user.email}` : " linked directly to this account"}
             </p>
           </div>
           <div className="divide-y divide-[var(--line)]">
@@ -208,7 +214,12 @@ export default async function CustomerPage() {
                   className="grid gap-3 px-6 py-5 sm:grid-cols-[0.8fr_1.2fr_1.4fr_0.8fr] sm:items-center"
                 >
                   <div>
-                    <p className="font-mono text-xs font-black">{booking.reference}</p>
+                    <Link
+                      href={`/booking/${booking.reference}`}
+                      className="font-mono text-xs font-black text-[var(--forest)] underline decoration-[var(--lime)] decoration-2 underline-offset-4"
+                    >
+                      {booking.reference}
+                    </Link>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">{booking.merchantName}</p>
                   </div>
                   <div>
@@ -235,7 +246,7 @@ export default async function CustomerPage() {
               <div className="px-6 py-14 text-center">
                 <p className="font-black">No bookings linked to this account yet.</p>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  Use your account email at checkout and your bookings will appear here.
+                  Book while signed in and your reservations will appear here automatically.
                 </p>
                 <Link
                   href="/#courts"

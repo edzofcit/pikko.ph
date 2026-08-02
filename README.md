@@ -12,7 +12,7 @@ This first application baseline includes:
   allocation, and pricing data.
 - Guest manual-payment booking requests with atomic court allocation, secure
   booking links, merchant instructions, configurable payment deadlines, and
-  private screenshot review.
+  private screenshot review. Guests receive the secure return link by email.
 - Distinct customer and merchant workspaces backed by one shared identity, so
   venue operators can switch into customer mode without a second account.
 - Merchant and platform-administrator dashboard shells.
@@ -85,11 +85,19 @@ private guest link or authorized merchant staff.
 
 Import the GitHub repository into Vercel. Next.js build settings are detected automatically. Configure secrets in Vercel for Preview and Production rather than committing `.env.local`.
 
+Booking emails use Resend. Connect Resend to the Vercel project so it injects
+`RESEND_API_KEY`, then set `EMAIL_FROM` to a sender on a verified domain. Until
+the domain is verified, Resend's testing sender can only deliver within its
+testing restrictions. `APP_URL` is optional; when omitted, booking links use
+the checkout request's origin. Customer booking email remains off unless
+`BOOKING_EMAIL_ENABLED=true`; the protected Admin test mailer can be used while
+that flag is off.
+
 ## Planned implementation sequence
 
 1. Merchant authentication, staff roles, and site assignments.
 2. Sites, courts, hours, closures, and pricing services.
 3. Atomic availability holds and booking state transitions.
 4. Maya Dynamic QR Ph payment adapter and webhook reconciliation.
-5. Transactional booking email.
+5. Payment-state, cancellation, refund, and reminder emails.
 6. Reporting, subscriptions, audit trail, and production hardening.

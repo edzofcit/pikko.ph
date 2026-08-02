@@ -4,9 +4,10 @@ import { getDb } from "@/db";
 import {
   bookingAccessTokens,
   bookings,
+  customers,
   manualPaymentProofs,
 } from "@/db/schema";
-import { getMerchantAccess } from "@/lib/auth/access";
+import { getMerchantAccess, syncCurrentUser } from "@/lib/auth/access";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
 
 export const runtime = "nodejs";
@@ -28,6 +29,8 @@ export async function GET(
       storageKey: manualPaymentProofs.storageKey,
       mimeType: manualPaymentProofs.mimeType,
       siteId: bookings.siteId,
+      customerId: bookings.customerId,
+      customerEmail: bookings.customerEmail,
     })
     .from(manualPaymentProofs)
     .innerJoin(bookings, eq(bookings.id, manualPaymentProofs.bookingId))
@@ -54,15 +57,31 @@ export async function GET(
       .limit(1);
     authorized = Boolean(guestAccess);
   } else {
-    const access = await getMerchantAccess();
-    authorized = Boolean(
-      access?.membership?.merchantId === proof.merchantId &&
-        access.sites.some((site) => site.id === proof.siteId) &&
-        access.permissions.some(
-          (permission) =>
-            permission === "verify_payments" || permission === "manage_bookings",
-        ),
-    );
+    const user = await syncCurrentUser();
+    if (user) {
+      const [customer] = await db
+        .select({ id: customers.id })
+        .from(customers)
+        .where(eq(customers.userId, user.id))
+        .limit(1);
+      authorized = Boolean(
+        (customer && proof.customerId === customer.id) ||
+          (user.emailVerifiedAt &&
+            proof.customerEmail?.toLowerCase() === user.email.toLowerCase()),
+      );
+    }
+
+    if (!authorized) {
+      const access = await getMerchantAccess();
+      authorized = Boolean(
+        access?.membership?.merchantId === proof.merchantId &&
+          access.sites.some((site) => site.id === proof.siteId) &&
+          access.permissions.some(
+            (permission) =>
+              permission === "verify_payments" || permission === "manage_bookings",
+          ),
+      );
+    }
   }
 
   if (!authorized) return new Response("Not found", { status: 404 });

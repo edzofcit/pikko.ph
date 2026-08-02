@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSiteAvailability } from "@/lib/booking/availability";
+import { syncCurrentUser } from "@/lib/auth/access";
+import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { formatPeso } from "@/lib/money";
 import { CheckoutForm } from "./checkout-form";
 
@@ -14,8 +16,14 @@ export default async function CheckoutReviewPage({
   searchParams: Promise<{ date?: string; court?: string; starts?: string }>;
 }) {
   const [{ merchantSlug, siteSlug }, query] = await Promise.all([params, searchParams]);
-  const availability = await getSiteAvailability(merchantSlug, siteSlug, query.date);
+  const [availability, signedInUser] = await Promise.all([
+    getSiteAvailability(merchantSlug, siteSlug, query.date),
+    syncCurrentUser(),
+  ]);
   if (!availability) notFound();
+  const customerProfile = signedInUser
+    ? await ensureCustomerProfile(signedInUser)
+    : null;
 
   const requestedStarts = (query.starts ?? "")
     .split(",")
@@ -55,6 +63,12 @@ export default async function CheckoutReviewPage({
   }
 
   const totalCents = selectedSlots.reduce((total, slot) => total + slot.rateCents, 0);
+  const checkoutHref = `/${availability.merchant.slug}/${availability.site.slug}/checkout?${new URLSearchParams({
+    date: availability.date,
+    court: court.id,
+    starts: selectedSlots.map((slot) => slot.startsAt).join(","),
+  }).toString()}`;
+  const customerAuthHref = `/auth/sign-up?audience=customer&callbackURL=${encodeURIComponent(checkoutHref)}`;
 
   return (
     <main className="min-h-screen">
@@ -89,11 +103,23 @@ export default async function CheckoutReviewPage({
         </div>
 
         <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--forest)] p-6 text-white">
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">Guest checkout</p>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">
+            {signedInUser ? "Customer checkout" : "Guest checkout"}
+          </p>
           <h2 className="mt-3 text-xl font-black">Your contact details</h2>
           <p className="mt-3 text-sm leading-6 text-white/75">
-            We&apos;ll use these details for this booking. You do not need to create an account.
+            {signedInUser
+              ? "Your booking will be linked to your Pikko customer account."
+              : "Continue as a guest or create an account to keep your bookings together."}
           </p>
+          {!signedInUser ? (
+            <Link
+              href={customerAuthHref}
+              className="mt-5 inline-flex w-full justify-center rounded-full border border-white/30 px-5 py-3 text-sm font-black text-white hover:bg-white/10"
+            >
+              Create customer account
+            </Link>
+          ) : null}
           {availability.site.manualPaymentEnabled ? (
             <div className="mt-6">
               <CheckoutForm
@@ -104,6 +130,19 @@ export default async function CheckoutReviewPage({
                 starts={selectedSlots.map((slot) => slot.startsAt)}
                 deadlineMinutes={availability.site.manualPaymentDeadlineMinutes}
                 reserveImmediately={availability.site.manualReservationMode === "reserve_immediately"}
+                customer={
+                  signedInUser
+                    ? {
+                        signedIn: true,
+                        fullName: customerProfile?.fullName ?? signedInUser.fullName,
+                        email: signedInUser.email,
+                        mobileNumber:
+                          customerProfile?.mobileNumber ??
+                          signedInUser.mobileNumber ??
+                          "",
+                      }
+                    : null
+                }
               />
             </div>
           ) : (

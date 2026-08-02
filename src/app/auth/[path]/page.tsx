@@ -27,13 +27,22 @@ export default async function AuthPage({
 
   const requestedCallback = validCallbackUrl(query.callbackURL);
   const audience =
-    query.audience === "customer" || query.audience === "merchant"
+    query.audience === "customer" ||
+    query.audience === "merchant" ||
+    query.audience === "admin"
       ? query.audience
+      : requestedCallback?.startsWith("/admin")
+        ? "admin"
       : requestedCallback?.startsWith("/customer")
         ? "customer"
         : "merchant";
   const callbackUrl =
-    requestedCallback ?? (audience === "customer" ? "/customer" : "/merchant");
+    requestedCallback ??
+    (audience === "customer"
+      ? "/customer"
+      : audience === "admin"
+        ? "/admin"
+        : "/merchant");
   const { data: session } = await getAuth().getSession();
 
   if (session?.user) {

@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { del, put } from "@vercel/blob";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import {
   bookingAccessTokens,
   bookings,
+  customers,
   manualPaymentProofs,
   payments,
 } from "@/db/schema";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
+import { syncCurrentUser } from "@/lib/auth/access";
 
 export const runtime = "nodejs";
 
@@ -23,7 +25,7 @@ const ALLOWED_TYPES = new Map([
 
 function bookingUrl(request: Request, reference: string, token: string) {
   const url = new URL(`/booking/${encodeURIComponent(reference)}`, request.url);
-  url.searchParams.set("token", token);
+  if (token) url.searchParams.set("token", token);
   return url;
 }
 
@@ -60,7 +62,7 @@ export async function POST(
   const notes = String(formData.get("notes") ?? "").trim();
   const screenshot = formData.get("screenshot");
 
-  if (!token || token.length > 1000) {
+  if (token.length > 1000) {
     return NextResponse.json({ error: "Invalid booking access." }, { status: 401 });
   }
   if (!(screenshot instanceof File)) {
@@ -89,40 +91,90 @@ export async function POST(
 
   const db = getDb();
   const now = new Date();
-  const [booking] = await db
-    .select({
-      id: bookings.id,
-      merchantId: bookings.merchantId,
-      status: bookings.status,
-      paymentStatus: bookings.paymentStatus,
-      paymentId: payments.id,
-      paymentProvider: payments.provider,
-    })
-    .from(bookingAccessTokens)
-    .innerJoin(
-      bookings,
-      and(
-        eq(bookings.id, bookingAccessTokens.bookingId),
-        eq(bookings.merchantId, bookingAccessTokens.merchantId),
-      ),
-    )
-    .innerJoin(
-      payments,
-      and(
-        eq(payments.bookingId, bookings.id),
-        eq(payments.merchantId, bookings.merchantId),
-        eq(payments.provider, "manual"),
-      ),
-    )
-    .where(
-      and(
-        eq(bookings.reference, reference),
-        eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
-        gt(bookingAccessTokens.expiresAt, now),
-        isNull(bookingAccessTokens.revokedAt),
-      ),
-    )
-    .limit(1);
+  const bookingFields = {
+    id: bookings.id,
+    merchantId: bookings.merchantId,
+    status: bookings.status,
+    paymentStatus: bookings.paymentStatus,
+    paymentId: payments.id,
+    paymentProvider: payments.provider,
+  };
+  type BookingRow = {
+    id: string;
+    merchantId: string;
+    status: (typeof bookings.$inferSelect)["status"];
+    paymentStatus: (typeof bookings.$inferSelect)["paymentStatus"];
+    paymentId: string;
+    paymentProvider: (typeof payments.$inferSelect)["provider"];
+  };
+  let booking: BookingRow | undefined;
+
+  if (token) {
+    [booking] = await db
+      .select(bookingFields)
+      .from(bookingAccessTokens)
+      .innerJoin(
+        bookings,
+        and(
+          eq(bookings.id, bookingAccessTokens.bookingId),
+          eq(bookings.merchantId, bookingAccessTokens.merchantId),
+        ),
+      )
+      .innerJoin(
+        payments,
+        and(
+          eq(payments.bookingId, bookings.id),
+          eq(payments.merchantId, bookings.merchantId),
+          eq(payments.provider, "manual"),
+        ),
+      )
+      .where(
+        and(
+          eq(bookings.reference, reference),
+          eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
+          gt(bookingAccessTokens.expiresAt, now),
+          isNull(bookingAccessTokens.revokedAt),
+        ),
+      )
+      .limit(1);
+  } else {
+    const user = await syncCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+    const [customer] = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.userId, user.id))
+      .limit(1);
+    const ownership = customer
+      ? user.emailVerifiedAt
+        ? or(
+            eq(bookings.customerId, customer.id),
+            sql`lower(${bookings.customerEmail}) = ${user.email}`,
+          )
+        : eq(bookings.customerId, customer.id)
+      : user.emailVerifiedAt
+        ? sql`lower(${bookings.customerEmail}) = ${user.email}`
+        : null;
+    if (!ownership) {
+      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    }
+
+    [booking] = await db
+      .select(bookingFields)
+      .from(bookings)
+      .innerJoin(
+        payments,
+        and(
+          eq(payments.bookingId, bookings.id),
+          eq(payments.merchantId, bookings.merchantId),
+          eq(payments.provider, "manual"),
+        ),
+      )
+      .where(and(eq(bookings.reference, reference), ownership))
+      .limit(1);
+  }
 
   if (!booking) {
     return NextResponse.json({ error: "Booking not found." }, { status: 404 });

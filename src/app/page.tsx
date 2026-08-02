@@ -34,6 +34,12 @@ export default async function Home() {
             Customer login
           </Link>
           <Link
+            href="/auth/sign-up?audience=customer&callbackURL=%2Fcustomer"
+            className="hidden rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white lg:inline-flex"
+          >
+            Customer signup
+          </Link>
+          <Link
             href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant"
             className="rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white"
           >
@@ -74,6 +80,12 @@ export default async function Home() {
               className="rounded-full bg-[var(--forest)] px-6 py-3.5 text-sm font-bold text-white shadow-[0_5px_0_#0d281a] transition hover:-translate-y-0.5 hover:shadow-[0_7px_0_#0d281a]"
             >
               Browse open slots
+            </Link>
+            <Link
+              href="/auth/sign-up?audience=customer&callbackURL=%2Fcustomer"
+              className="rounded-full border border-[var(--forest)] px-6 py-3.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white/70"
+            >
+              Create customer account
             </Link>
             <span className="text-sm font-medium text-[var(--muted)]">
               Guest checkout available
