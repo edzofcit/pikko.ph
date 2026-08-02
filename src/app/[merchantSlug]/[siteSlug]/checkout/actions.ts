@@ -17,10 +17,6 @@ import { getSiteAvailability } from "@/lib/booking/availability";
 import { syncCurrentUser } from "@/lib/auth/access";
 import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
-import {
-  isManualPaymentProvider,
-  normalizeManualPaymentOptions,
-} from "@/lib/manual-payment/options";
 
 export type ManualBookingState = { error: string | null };
 
@@ -95,7 +91,6 @@ export async function createManualBooking(
   const submittedEmail = readText(formData, "email").toLowerCase();
   const mobileNumber = readText(formData, "mobileNumber");
   const customerNotes = readText(formData, "customerNotes");
-  const manualPaymentProvider = readText(formData, "manualPaymentProvider");
   const signedInUser = await syncCurrentUser();
   const fullName = submittedFullName || signedInUser?.fullName || "";
   const email = signedInUser?.email ?? submittedEmail;
@@ -120,19 +115,6 @@ export async function createManualBooking(
   const availability = await getSiteAvailability(merchantSlug, siteSlug, date);
   if (!availability || !availability.site.manualPaymentEnabled) {
     return { error: "Manual payment is not available for this venue." };
-  }
-
-  const paymentOptions = normalizeManualPaymentOptions(
-    availability.site.manualPaymentOptions,
-  );
-  const selectedPaymentOption = paymentOptions.find(
-    (option) => option.provider === manualPaymentProvider,
-  );
-  if (
-    paymentOptions.length > 0 &&
-    (!isManualPaymentProvider(manualPaymentProvider) || !selectedPaymentOption)
-  ) {
-    return { error: "Choose one of the venue's available QR payment options." };
   }
 
   const court = availability.courts.find((item) => item.id === courtId);
@@ -248,7 +230,6 @@ export async function createManualBooking(
         manualReservationMode: availability.site.manualReservationMode,
         manualPaymentDeadlineMinutes:
           availability.site.manualPaymentDeadlineMinutes,
-        manualPaymentProvider: selectedPaymentOption?.provider ?? null,
       },
     });
   const insertItems = db.insert(bookingItems).values(itemRows);
@@ -264,11 +245,6 @@ export async function createManualBooking(
       expiresAt: paymentDueAt,
       metadata: {
         source: signedInUser ? "customer_checkout" : "guest_checkout",
-        manualPaymentProvider: selectedPaymentOption?.provider ?? null,
-        manualPaymentLabel: selectedPaymentOption?.label ?? null,
-        manualPaymentQrUrl: selectedPaymentOption?.qrImageUrl ?? null,
-        manualPaymentQrPathname:
-          selectedPaymentOption?.qrImagePathname ?? null,
       },
     });
   const insertAccessToken = db.insert(bookingAccessTokens).values({

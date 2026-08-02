@@ -216,6 +216,11 @@ export default async function GuestBookingPage({
       </header>
 
       <section className="mx-auto max-w-4xl px-5 py-12 sm:px-8">
+        <ol className="mb-7 grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black">
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Choose time</li>
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Your details</li>
+          <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">3 · Payment</li>
+        </ol>
         <div className="rounded-3xl bg-[var(--forest)] p-7 text-white sm:p-9">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lime)]">
             Booking received
@@ -280,9 +285,7 @@ export default async function GuestBookingPage({
                 {booking.manualPaymentInstructions ||
                   "Contact the venue using your booking reference for its current payment instructions."}
               </p>
-            </section>
-
-            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+              <div className="mt-7 border-t border-[var(--line)] pt-7">
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
                 Payment proof
               </p>
@@ -372,6 +375,7 @@ export default async function GuestBookingPage({
                   ))}
                 </div>
               ) : null}
+              </div>
             </section>
           </div>
 

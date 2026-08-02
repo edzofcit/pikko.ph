@@ -1,8 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { ManualPaymentQrSelector } from "@/components/manual-payment-qr-selector";
-import type { ManualPaymentOption } from "@/lib/manual-payment/options";
 import {
   createManualBooking,
   type ManualBookingState,
@@ -18,7 +16,6 @@ export function CheckoutForm({
   starts,
   deadlineMinutes,
   reserveImmediately,
-  paymentOptions,
   customer,
 }: {
   merchantSlug: string;
@@ -28,7 +25,6 @@ export function CheckoutForm({
   starts: string[];
   deadlineMinutes: number;
   reserveImmediately: boolean;
-  paymentOptions: ManualPaymentOption[];
   customer: {
     signedIn: boolean;
     fullName: string;
@@ -116,12 +112,6 @@ export function CheckoutForm({
         </p>
       </div>
 
-      <ManualPaymentQrSelector
-        options={paymentOptions}
-        inputName="manualPaymentProvider"
-        tone="dark"
-      />
-
       <label className="flex items-start gap-3 text-sm leading-5 text-white/80">
         <input
           name="acceptPolicies"
@@ -146,7 +136,7 @@ export function CheckoutForm({
         disabled={pending}
         className="w-full rounded-full bg-[var(--lime)] px-5 py-3.5 text-sm font-black text-[var(--ink)] disabled:opacity-60"
       >
-        {pending ? "Reserving your court…" : "Book with manual payment"}
+        {pending ? "Preparing payment…" : "Continue to payment"}
       </button>
     </form>
   );
