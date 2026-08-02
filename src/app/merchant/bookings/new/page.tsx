@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function NewMerchantBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ site?: string; date?: string }>;
+  searchParams: Promise<{ site?: string; date?: string; court?: string; starts?: string }>;
 }) {
   const [access, query] = await Promise.all([
     requireMerchantPermission("manage_bookings"),
@@ -107,6 +107,8 @@ export default async function NewMerchantBookingPage({
               courts={availability.courts}
               siteSlug={availability.site.slug}
               date={availability.date}
+              initialCourtId={query.court}
+              initialStarts={query.starts?.split(",").filter(Boolean)}
             />
           ) : (
             <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-6 text-sm font-bold text-red-800">

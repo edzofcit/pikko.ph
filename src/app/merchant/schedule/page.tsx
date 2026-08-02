@@ -78,7 +78,7 @@ function entryDisplayState(entry: ScheduleEntry): AvailabilityDisplayState {
 export default async function MerchantSchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; site?: string }>;
+  searchParams: Promise<{ date?: string; site?: string; success?: string }>;
 }) {
   const [access, query] = await Promise.all([
     requireMerchantPermission("manage_bookings"),
@@ -196,6 +196,11 @@ export default async function MerchantSchedulePage({
         { label: "Needs attention", value: String(pendingPayments), note: "Pending payments" },
       ]}
     >
+      {query.success ? (
+        <p role="status" className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-900">
+          {query.success}
+        </p>
+      ) : null}
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
         <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <label className="text-xs font-black text-[var(--forest)]">
@@ -314,15 +319,23 @@ export default async function MerchantSchedulePage({
                           }
                           if (state === "available") {
                             return (
-                              <Link
-                                key={court.id}
-                                role="gridcell"
-                                href={`/merchant/bookings/new?site=${availability.site.id}&date=${selectedDate}`}
-                                className={className}
-                                aria-label={`Create booking for ${court.name} at ${row.label}`}
-                              >
-                                {content}
-                              </Link>
+                              <div key={court.id} role="gridcell" className={`overflow-hidden p-0 ${className}`}>
+                                <Link
+                                  href={`/merchant/bookings/new?site=${availability.site.id}&date=${selectedDate}&court=${court.id}&starts=${encodeURIComponent(row.startsAt)}`}
+                                  className="block px-3 py-2"
+                                  aria-label={`Create booking for ${court.name} at ${row.label}`}
+                                >
+                                  {content}
+                                </Link>
+                                {access.permissions.includes("manage_courts") ? (
+                                  <Link
+                                    href={`/merchant/blocks?site=${availability.site.id}&date=${selectedDate}&court=${court.id}&starts=${encodeURIComponent(row.startsAt)}`}
+                                    className="block border-t border-sky-300 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-wide hover:bg-white/50"
+                                  >
+                                    Block time
+                                  </Link>
+                                ) : null}
+                              </div>
                             );
                           }
                           return (

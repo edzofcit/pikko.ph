@@ -29,7 +29,9 @@ export function SlotPicker({
       Array.from(
         new Map(
           courts.flatMap((court) =>
-            court.schedule.map((slot) => [slot.startsAt, slot.label] as const),
+            court.schedule
+              .filter((slot) => slot.state !== "past" && slot.state !== "closed")
+              .map((slot) => [slot.startsAt, slot.label] as const),
           ),
         ),
       )
@@ -97,8 +99,8 @@ export function SlotPicker({
   if (timeRows.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-[var(--line)] bg-white px-6 py-14 text-center">
-        <p className="font-black">The courts are closed on this date.</p>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">Choose another day to see hourly availability.</p>
+        <p className="font-black">No future booking hours remain for this date.</p>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Choose another day to see court availability.</p>
       </div>
     );
   }
@@ -112,7 +114,7 @@ export function SlotPicker({
             <h2 className="mt-1 text-2xl font-black">Choose an open hour</h2>
             <p className="mt-2 text-sm text-[var(--text-muted)]">Scroll sideways to compare every court at the same time.</p>
           </div>
-          <AvailabilityLegend states={["selected", "available", "booked", "held", "blocked", "closed", "past"]} />
+          <AvailabilityLegend states={["selected", "available", "booked", "held", "blocked", "unavailable"]} />
         </div>
 
         <div className="mt-5 overflow-x-auto pb-2">
@@ -152,13 +154,16 @@ export function SlotPicker({
                 </div>
                 {courts.map((court) => {
                   const slot = scheduleByCourt.get(court.id)?.get(row.startsAt);
+                  if (!slot || slot.state === "closed" || slot.state === "past") {
+                    return <div key={court.id} role="gridcell" aria-hidden="true" className="min-h-16" />;
+                  }
                   const selected = selection?.courtId === court.id && selection.starts.includes(row.startsAt);
-                  const displayState = selected ? "selected" : slot?.state ?? "closed";
+                  const displayState = selected ? "selected" : slot.state;
                   const label = availabilityStateLabels[displayState];
                   const content = (
                     <>
                       <span className="block text-xs font-black">{label}</span>
-                      {slot?.rateCents !== null && slot?.rateCents !== undefined && (slot.state === "available" || selected) ? (
+                      {slot.rateCents !== null && (slot.state === "available" || selected) ? (
                         <span className={`mt-1 block text-[0.68rem] ${selected ? "text-white/80" : "opacity-75"}`}>
                           {formatPeso(slot.rateCents)}
                         </span>
