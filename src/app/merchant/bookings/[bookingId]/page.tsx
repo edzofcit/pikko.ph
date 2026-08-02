@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { getDb } from "@/db";
 import {
   bookingItems,
@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatPeso } from "@/lib/money";
+import { formatMerchantRole } from "@/lib/auth/permissions";
 import {
   approveManualPaymentProof,
   markStaffBookingPaid,
@@ -121,19 +122,15 @@ export default async function MerchantBookingPage({
   ]);
 
   return (
-    <DashboardShell
-      eyebrow={`${booking.provider === "manual" ? "Payment review" : "Staff booking"} · ${booking.siteName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={booking.siteId} activeHref="/merchant/bookings"
+      eyebrow={booking.provider === "manual" ? "Payment review" : "Staff booking"}
       title={`Booking ${booking.reference}`}
       description={
         booking.provider === "manual"
           ? "Review the customer's payment screenshot before confirming the court reservation."
           : "Review the customer, payment, and reserved court time for this staff-created booking."
       }
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        { href: "/merchant/schedule", label: "Schedule" },
-        { href: "/customer", label: "Customer mode" },
-      ]}
       metrics={[
         { label: "Booking status", value: booking.status.replaceAll("_", " "), note: `Created ${formatDateTime(booking.createdAt, booking.timezone)}` },
         { label: "Payment", value: booking.paymentStatus.replaceAll("_", " "), note: booking.provider === "manual" ? "Manual payment" : booking.provider },
@@ -305,6 +302,6 @@ export default async function MerchantBookingPage({
           </section>
         </aside>
       </div>
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

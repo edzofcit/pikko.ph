@@ -7,7 +7,7 @@ import {
   availabilityStateStyles,
   type AvailabilityDisplayState,
 } from "@/components/availability-legend";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { getDb } from "@/db";
 import { bookingItems, bookings, merchants } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
@@ -16,6 +16,7 @@ import {
   type SiteAvailability,
 } from "@/lib/booking/availability";
 import { formatPeso } from "@/lib/money";
+import { formatMerchantRole } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = { title: "Court schedule" };
 export const dynamic = "force-dynamic";
@@ -174,17 +175,11 @@ export default async function MerchantSchedulePage({
   const siteQuery = selectedSiteId ? `&site=${selectedSiteId}` : "";
 
   return (
-    <DashboardShell
-      eyebrow={`Daily operations · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={selectedSiteId} activeHref="/merchant/schedule"
+      eyebrow="Daily operations"
       title="Court schedule"
       description="See every reservation across your courts, spot open time, and open bookings that need payment follow-up."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
-          : []),
-        { href: "/customer", label: "Customer mode" },
-      ]}
       primaryAction={{
         href: "/merchant/bookings/new",
         label: "+ Create booking",
@@ -364,6 +359,6 @@ export default async function MerchantSchedulePage({
           </div>
         ) : null}
       </section>
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

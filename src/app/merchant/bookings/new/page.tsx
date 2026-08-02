@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { MerchantBookingForm } from "./merchant-booking-form";
+import { formatMerchantRole } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = { title: "Create booking" };
 export const dynamic = "force-dynamic";
@@ -33,17 +34,11 @@ export default async function NewMerchantBookingPage({
     ) ?? 0;
 
   return (
-    <DashboardShell
-      eyebrow={`Staff booking · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={selectedSite?.id ?? ""} activeHref="/merchant/bookings/new"
+      eyebrow="Staff booking"
       title="Create a booking"
       description="Reserve available court time for a walk-in, phone customer, or complimentary session."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        { href: "/merchant/schedule", label: "Schedule" },
-        ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
-          : []),
-      ]}
       metrics={[
         {
           label: "Selected site",
@@ -129,6 +124,6 @@ export default async function NewMerchantBookingPage({
           ) : null}
         </section>
       )}
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

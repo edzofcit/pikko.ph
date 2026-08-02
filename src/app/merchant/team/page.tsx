@@ -7,7 +7,7 @@ import {
   sites,
   users,
 } from "@/db/schema";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatMerchantRole } from "@/lib/auth/permissions";
 import { inviteMerchantStaff } from "./actions";
@@ -74,19 +74,11 @@ export default async function MerchantTeamPage({
   const feedbackIsError = Boolean(query.error);
 
   return (
-    <DashboardShell
-      eyebrow={`Team access · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId="" activeHref="/merchant/team"
+      eyebrow="Team access"
       title="Invite staff with the right access."
       description="Roles control permitted actions. Site assignments limit non-owner staff to the venues they operate."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        ...(access.permissions.includes("manage_bookings")
-          ? [{ href: "/merchant/schedule", label: "Schedule" }]
-          : []),
-        ...(access.permissions.includes("manage_courts")
-          ? [{ href: "/merchant/sites", label: "Sites & courts" }]
-          : []),
-      ]}
       metrics={[
         { label: "Team members", value: String(staff.length), note: "Active and invited" },
         { label: "Owners", value: String(staff.filter((member) => member.role === "owner").length), note: "Full merchant access" },
@@ -220,6 +212,6 @@ export default async function MerchantTeamPage({
       <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
         Need to leave team access? <Link href="/merchant">Return to dashboard</Link>.
       </p>
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

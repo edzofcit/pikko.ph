@@ -1,13 +1,14 @@
 import { and, asc, eq, gt, isNull, lt } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { getDb } from "@/db";
 import { courtBlocks, courts } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { cancelCourtBlock } from "./actions";
 import { CourtBlockForm } from "./court-block-form";
+import { formatMerchantRole } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = { title: "Court blocks" };
 export const dynamic = "force-dynamic";
@@ -88,15 +89,11 @@ export default async function MerchantBlocksPage({
     : [];
 
   return (
-    <DashboardShell
-      eyebrow={`Court operations · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId={selectedSite?.id ?? ""} activeHref="/merchant/blocks"
+      eyebrow="Court operations"
       title="Block court time"
       description="Remove court hours from public availability for maintenance, private events, or temporary closures."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        { href: "/merchant/schedule", label: "Schedule" },
-        { href: "/merchant/sites", label: "Sites & courts" },
-      ]}
       metrics={[
         { label: "Selected site", value: selectedSite?.name ?? "None", note: "Assigned venue" },
         { label: "Date", value: availability?.date ?? "—", note: "Venue-local day" },
@@ -176,6 +173,6 @@ export default async function MerchantBlocksPage({
           <p className="font-black">No active sites are assigned to your account.</p>
         </section>
       )}
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
 import { SiteLocationPicker } from "@/components/site-location-picker";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
@@ -98,19 +98,11 @@ export default async function MerchantVenuesPage({
   const feedbackIsError = Boolean(query.error);
 
   return (
-    <DashboardShell
-      eyebrow={`Sites and courts · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId="" activeHref="/merchant/sites"
+      eyebrow="Sites and courts"
       title="Set up where customers play."
       description="Create each physical venue as a site, then add its courts and standard hourly rates. Courts inherit the site's operating hours until you add an override."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        ...(access.permissions.includes("manage_bookings")
-          ? [{ href: "/merchant/schedule", label: "Schedule" }]
-          : []),
-        ...(access.permissions.includes("manage_staff")
-          ? [{ href: "/merchant/team", label: "Team" }]
-          : []),
-      ]}
       metrics={[
         { label: "Active sites", value: String(venueSites.length), note: "Physical venue locations" },
         { label: "Active courts", value: String(venueCourts.filter((court) => court.status === "active").length), note: "Bookable inventory" },
@@ -506,6 +498,6 @@ export default async function MerchantVenuesPage({
           ) : null}
         </div>
       </section>
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }
