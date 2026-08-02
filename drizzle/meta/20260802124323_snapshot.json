@@ -1,0 +1,6090 @@
+{
+  "id": "62e1c7ea-00c9-4ef1-a820-034e8584b0c6",
+  "prevId": "ff0b999c-e4fb-4fdd-9225-c9d8c297863b",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.booking_access_tokens": {
+      "name": "booking_access_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "booking_access_tokens_hash_uidx": {
+          "name": "booking_access_tokens_hash_uidx",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "booking_access_tokens_booking_idx": {
+          "name": "booking_access_tokens_booking_idx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "booking_access_tokens_expiry_idx": {
+          "name": "booking_access_tokens_expiry_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "booking_access_tokens_merchant_id_merchants_id_fk": {
+          "name": "booking_access_tokens_merchant_id_merchants_id_fk",
+          "tableFrom": "booking_access_tokens",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "booking_access_tokens_booking_tenant_fk": {
+          "name": "booking_access_tokens_booking_tenant_fk",
+          "tableFrom": "booking_access_tokens",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "merchant_id",
+            "booking_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.booking_items": {
+      "name": "booking_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_rate_cents": {
+          "name": "hourly_rate_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_total_cents": {
+          "name": "line_total_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_rule_snapshot": {
+          "name": "price_rule_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "booking_items_booking_court_start_uidx": {
+          "name": "booking_items_booking_court_start_uidx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "booking_items_court_period_idx": {
+          "name": "booking_items_court_period_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "booking_items_merchant_id_merchants_id_fk": {
+          "name": "booking_items_merchant_id_merchants_id_fk",
+          "tableFrom": "booking_items",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "booking_items_booking_tenant_fk": {
+          "name": "booking_items_booking_tenant_fk",
+          "tableFrom": "booking_items",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "merchant_id",
+            "booking_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "booking_items_court_tenant_fk": {
+          "name": "booking_items_court_tenant_fk",
+          "tableFrom": "booking_items",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "booking_items_valid_period": {
+          "name": "booking_items_valid_period",
+          "value": "\"booking_items\".\"starts_at\" < \"booking_items\".\"ends_at\""
+        },
+        "booking_items_amounts_nonnegative": {
+          "name": "booking_items_amounts_nonnegative",
+          "value": "\"booking_items\".\"hourly_rate_cents\" >= 0 and \"booking_items\".\"line_total_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.bookings": {
+      "name": "bookings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "booking_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "booking_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "payment_status": {
+          "name": "payment_status",
+          "type": "payment_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unpaid'"
+        },
+        "customer_name": {
+          "name": "customer_name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_email": {
+          "name": "customer_email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_mobile_number": {
+          "name": "customer_mobile_number",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PHP'"
+        },
+        "subtotal_cents": {
+          "name": "subtotal_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "discount_cents": {
+          "name": "discount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "tax_cents": {
+          "name": "tax_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "merchant_fee_cents": {
+          "name": "merchant_fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_cents": {
+          "name": "total_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "promo_code_id": {
+          "name": "promo_code_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancellation_policy_id": {
+          "name": "cancellation_policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policy_snapshot": {
+          "name": "policy_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "pricing_snapshot": {
+          "name": "pricing_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "customer_notes": {
+          "name": "customer_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "internal_notes": {
+          "name": "internal_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_due_at": {
+          "name": "payment_due_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_by_user_id": {
+          "name": "cancelled_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancellation_reason": {
+          "name": "cancellation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "bookings_reference_uidx": {
+          "name": "bookings_reference_uidx",
+          "columns": [
+            {
+              "expression": "reference",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bookings_merchant_site_created_idx": {
+          "name": "bookings_merchant_site_created_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bookings_merchant_status_idx": {
+          "name": "bookings_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bookings_customer_idx": {
+          "name": "bookings_customer_idx",
+          "columns": [
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bookings_merchant_id_merchants_id_fk": {
+          "name": "bookings_merchant_id_merchants_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "bookings_customer_id_customers_id_fk": {
+          "name": "bookings_customer_id_customers_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "bookings_promo_code_id_promo_codes_id_fk": {
+          "name": "bookings_promo_code_id_promo_codes_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "promo_codes",
+          "columnsFrom": [
+            "promo_code_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "bookings_cancellation_policy_id_cancellation_policies_id_fk": {
+          "name": "bookings_cancellation_policy_id_cancellation_policies_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "cancellation_policies",
+          "columnsFrom": [
+            "cancellation_policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "bookings_cancelled_by_user_id_users_id_fk": {
+          "name": "bookings_cancelled_by_user_id_users_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "users",
+          "columnsFrom": [
+            "cancelled_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "bookings_created_by_user_id_users_id_fk": {
+          "name": "bookings_created_by_user_id_users_id_fk",
+          "tableFrom": "bookings",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "bookings_site_tenant_fk": {
+          "name": "bookings_site_tenant_fk",
+          "tableFrom": "bookings",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "bookings_merchant_id_id_key": {
+          "name": "bookings_merchant_id_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "merchant_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "bookings_amounts_nonnegative": {
+          "name": "bookings_amounts_nonnegative",
+          "value": "\"bookings\".\"subtotal_cents\" >= 0 and \"bookings\".\"discount_cents\" >= 0 and \"bookings\".\"tax_cents\" >= 0 and \"bookings\".\"merchant_fee_cents\" >= 0 and \"bookings\".\"total_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.checkout_hold_items": {
+      "name": "checkout_hold_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hold_id": {
+          "name": "hold_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quoted_rate_cents": {
+          "name": "quoted_rate_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "checkout_hold_items_hold_court_start_uidx": {
+          "name": "checkout_hold_items_hold_court_start_uidx",
+          "columns": [
+            {
+              "expression": "hold_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "checkout_hold_items_merchant_id_merchants_id_fk": {
+          "name": "checkout_hold_items_merchant_id_merchants_id_fk",
+          "tableFrom": "checkout_hold_items",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "checkout_hold_items_hold_id_checkout_holds_id_fk": {
+          "name": "checkout_hold_items_hold_id_checkout_holds_id_fk",
+          "tableFrom": "checkout_hold_items",
+          "tableTo": "checkout_holds",
+          "columnsFrom": [
+            "hold_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "checkout_hold_items_court_tenant_fk": {
+          "name": "checkout_hold_items_court_tenant_fk",
+          "tableFrom": "checkout_hold_items",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "checkout_hold_items_valid_period": {
+          "name": "checkout_hold_items_valid_period",
+          "value": "\"checkout_hold_items\".\"starts_at\" < \"checkout_hold_items\".\"ends_at\""
+        },
+        "checkout_hold_items_rate_nonnegative": {
+          "name": "checkout_hold_items_rate_nonnegative",
+          "value": "\"checkout_hold_items\".\"quoted_rate_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.checkout_holds": {
+      "name": "checkout_holds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "checkout_hold_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PHP'"
+        },
+        "quoted_total_cents": {
+          "name": "quoted_total_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pricing_snapshot": {
+          "name": "pricing_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "converted_at": {
+          "name": "converted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "checkout_holds_token_hash_uidx": {
+          "name": "checkout_holds_token_hash_uidx",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "checkout_holds_status_expiry_idx": {
+          "name": "checkout_holds_status_expiry_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "checkout_holds_merchant_id_merchants_id_fk": {
+          "name": "checkout_holds_merchant_id_merchants_id_fk",
+          "tableFrom": "checkout_holds",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "checkout_holds_site_tenant_fk": {
+          "name": "checkout_holds_site_tenant_fk",
+          "tableFrom": "checkout_holds",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "checkout_holds_total_nonnegative": {
+          "name": "checkout_holds_total_nonnegative",
+          "value": "\"checkout_holds\".\"quoted_total_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.court_allocations": {
+      "name": "court_allocations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "court_allocation_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_item_id": {
+          "name": "booking_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "checkout_hold_item_id": {
+          "name": "checkout_hold_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "court_block_id": {
+          "name": "court_block_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "court_allocations_booking_item_uidx": {
+          "name": "court_allocations_booking_item_uidx",
+          "columns": [
+            {
+              "expression": "booking_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_allocations_hold_item_uidx": {
+          "name": "court_allocations_hold_item_uidx",
+          "columns": [
+            {
+              "expression": "checkout_hold_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_allocations_block_uidx": {
+          "name": "court_allocations_block_uidx",
+          "columns": [
+            {
+              "expression": "court_block_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_allocations_court_active_period_idx": {
+          "name": "court_allocations_court_active_period_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_allocations_expiry_idx": {
+          "name": "court_allocations_expiry_idx",
+          "columns": [
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "court_allocations_merchant_id_merchants_id_fk": {
+          "name": "court_allocations_merchant_id_merchants_id_fk",
+          "tableFrom": "court_allocations",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_allocations_booking_item_id_booking_items_id_fk": {
+          "name": "court_allocations_booking_item_id_booking_items_id_fk",
+          "tableFrom": "court_allocations",
+          "tableTo": "booking_items",
+          "columnsFrom": [
+            "booking_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_allocations_checkout_hold_item_id_checkout_hold_items_id_fk": {
+          "name": "court_allocations_checkout_hold_item_id_checkout_hold_items_id_fk",
+          "tableFrom": "court_allocations",
+          "tableTo": "checkout_hold_items",
+          "columnsFrom": [
+            "checkout_hold_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_allocations_court_block_id_court_blocks_id_fk": {
+          "name": "court_allocations_court_block_id_court_blocks_id_fk",
+          "tableFrom": "court_allocations",
+          "tableTo": "court_blocks",
+          "columnsFrom": [
+            "court_block_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_allocations_court_tenant_fk": {
+          "name": "court_allocations_court_tenant_fk",
+          "tableFrom": "court_allocations",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "court_allocations_valid_period": {
+          "name": "court_allocations_valid_period",
+          "value": "\"court_allocations\".\"starts_at\" < \"court_allocations\".\"ends_at\""
+        },
+        "court_allocations_exactly_one_source": {
+          "name": "court_allocations_exactly_one_source",
+          "value": "num_nonnulls(\"court_allocations\".\"booking_item_id\", \"court_allocations\".\"checkout_hold_item_id\", \"court_allocations\".\"court_block_id\") = 1"
+        },
+        "court_allocations_kind_matches_source": {
+          "name": "court_allocations_kind_matches_source",
+          "value": "(\"court_allocations\".\"kind\" = 'booking' and \"court_allocations\".\"booking_item_id\" is not null) or (\"court_allocations\".\"kind\" = 'checkout_hold' and \"court_allocations\".\"checkout_hold_item_id\" is not null) or (\"court_allocations\".\"kind\" = 'merchant_block' and \"court_allocations\".\"court_block_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.customers": {
+      "name": "customers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mobile_number": {
+          "name": "mobile_number",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketing_consent_at": {
+          "name": "marketing_consent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "customers_email_uidx": {
+          "name": "customers_email_uidx",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "customers_user_uidx": {
+          "name": "customers_user_uidx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "customers_user_id_users_id_fk": {
+          "name": "customers_user_id_users_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.promo_codes": {
+      "name": "promo_codes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discount_type": {
+          "name": "discount_type",
+          "type": "discount_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discount_value": {
+          "name": "discount_value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maximum_discount_cents": {
+          "name": "maximum_discount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "minimum_spend_cents": {
+          "name": "minimum_spend_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "redemption_limit": {
+          "name": "redemption_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "per_customer_limit": {
+          "name": "per_customer_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "promo_codes_merchant_code_uidx": {
+          "name": "promo_codes_merchant_code_uidx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "upper(\"code\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "promo_codes_merchant_active_idx": {
+          "name": "promo_codes_merchant_active_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "promo_codes_merchant_id_merchants_id_fk": {
+          "name": "promo_codes_merchant_id_merchants_id_fk",
+          "tableFrom": "promo_codes",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "promo_codes_value_positive": {
+          "name": "promo_codes_value_positive",
+          "value": "\"promo_codes\".\"discount_value\" > 0"
+        },
+        "promo_codes_minimum_nonnegative": {
+          "name": "promo_codes_minimum_nonnegative",
+          "value": "\"promo_codes\".\"minimum_spend_cents\" >= 0"
+        },
+        "promo_codes_percentage_range": {
+          "name": "promo_codes_percentage_range",
+          "value": "\"promo_codes\".\"discount_type\" <> 'percentage' or \"promo_codes\".\"discount_value\" <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.promo_redemptions": {
+      "name": "promo_redemptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promo_code_id": {
+          "name": "promo_code_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_email": {
+          "name": "customer_email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discount_cents": {
+          "name": "discount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "promo_redemptions_booking_uidx": {
+          "name": "promo_redemptions_booking_uidx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "promo_redemptions_code_created_idx": {
+          "name": "promo_redemptions_code_created_idx",
+          "columns": [
+            {
+              "expression": "promo_code_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "promo_redemptions_merchant_id_merchants_id_fk": {
+          "name": "promo_redemptions_merchant_id_merchants_id_fk",
+          "tableFrom": "promo_redemptions",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "promo_redemptions_promo_code_id_promo_codes_id_fk": {
+          "name": "promo_redemptions_promo_code_id_promo_codes_id_fk",
+          "tableFrom": "promo_redemptions",
+          "tableTo": "promo_codes",
+          "columnsFrom": [
+            "promo_code_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "promo_redemptions_customer_id_customers_id_fk": {
+          "name": "promo_redemptions_customer_id_customers_id_fk",
+          "tableFrom": "promo_redemptions",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "promo_redemptions_booking_tenant_fk": {
+          "name": "promo_redemptions_booking_tenant_fk",
+          "tableFrom": "promo_redemptions",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "merchant_id",
+            "booking_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "promo_redemptions_discount_nonnegative": {
+          "name": "promo_redemptions_discount_nonnegative",
+          "value": "\"promo_redemptions\".\"discount_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.merchant_memberships": {
+      "name": "merchant_memberships",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "merchant_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "user_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'invited'"
+        },
+        "invited_by_user_id": {
+          "name": "invited_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invited_at": {
+          "name": "invited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "merchant_memberships_merchant_user_uidx": {
+          "name": "merchant_memberships_merchant_user_uidx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "merchant_memberships_user_idx": {
+          "name": "merchant_memberships_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "merchant_memberships_merchant_status_idx": {
+          "name": "merchant_memberships_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "merchant_memberships_merchant_id_merchants_id_fk": {
+          "name": "merchant_memberships_merchant_id_merchants_id_fk",
+          "tableFrom": "merchant_memberships",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "merchant_memberships_user_id_users_id_fk": {
+          "name": "merchant_memberships_user_id_users_id_fk",
+          "tableFrom": "merchant_memberships",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "merchant_memberships_invited_by_user_id_users_id_fk": {
+          "name": "merchant_memberships_invited_by_user_id_users_id_fk",
+          "tableFrom": "merchant_memberships",
+          "tableTo": "users",
+          "columnsFrom": [
+            "invited_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.merchants": {
+      "name": "merchants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "legal_name": {
+          "name": "legal_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "merchant_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'onboarding'"
+        },
+        "default_timezone": {
+          "name": "default_timezone",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Asia/Manila'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PHP'"
+        },
+        "contact_email": {
+          "name": "contact_email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_phone": {
+          "name": "contact_phone",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_pathname": {
+          "name": "logo_pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_url": {
+          "name": "cover_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_pathname": {
+          "name": "cover_pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subscription_status": {
+          "name": "subscription_status",
+          "type": "subscription_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'trialing'"
+        },
+        "trial_ends_at": {
+          "name": "trial_ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP + interval '14 days'"
+        },
+        "monthly_court_price_cents": {
+          "name": "monthly_court_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 59900
+        },
+        "gateway_fee_basis_points": {
+          "name": "gateway_fee_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "merchants_slug_uidx": {
+          "name": "merchants_slug_uidx",
+          "columns": [
+            {
+              "expression": "lower(\"slug\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "merchants_monthly_court_price_nonnegative": {
+          "name": "merchants_monthly_court_price_nonnegative",
+          "value": "\"merchants\".\"monthly_court_price_cents\" >= 0"
+        },
+        "merchants_gateway_fee_basis_points_range": {
+          "name": "merchants_gateway_fee_basis_points_range",
+          "value": "\"merchants\".\"gateway_fee_basis_points\" >= 0 and \"merchants\".\"gateway_fee_basis_points\" <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_subject": {
+          "name": "auth_subject",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mobile_number": {
+          "name": "mobile_number",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "user_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'invited'"
+        },
+        "platform_role": {
+          "name": "platform_role",
+          "type": "platform_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_signed_in_at": {
+          "name": "last_signed_in_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_email_uidx": {
+          "name": "users_email_uidx",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_auth_subject_uidx": {
+          "name": "users_auth_subject_uidx",
+          "columns": [
+            {
+              "expression": "auth_subject",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.manual_payment_proofs": {
+      "name": "manual_payment_proofs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_id": {
+          "name": "payment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "manual_proof_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'submitted'"
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_notes": {
+          "name": "customer_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by_user_id": {
+          "name": "reviewed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rejection_reason": {
+          "name": "rejection_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "manual_payment_proofs_booking_created_idx": {
+          "name": "manual_payment_proofs_booking_created_idx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "manual_payment_proofs_merchant_status_idx": {
+          "name": "manual_payment_proofs_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "manual_payment_proofs_merchant_id_merchants_id_fk": {
+          "name": "manual_payment_proofs_merchant_id_merchants_id_fk",
+          "tableFrom": "manual_payment_proofs",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "manual_payment_proofs_booking_id_bookings_id_fk": {
+          "name": "manual_payment_proofs_booking_id_bookings_id_fk",
+          "tableFrom": "manual_payment_proofs",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "manual_payment_proofs_payment_id_payments_id_fk": {
+          "name": "manual_payment_proofs_payment_id_payments_id_fk",
+          "tableFrom": "manual_payment_proofs",
+          "tableTo": "payments",
+          "columnsFrom": [
+            "payment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "manual_payment_proofs_reviewed_by_user_id_users_id_fk": {
+          "name": "manual_payment_proofs_reviewed_by_user_id_users_id_fk",
+          "tableFrom": "manual_payment_proofs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "manual_payment_proofs_size_positive": {
+          "name": "manual_payment_proofs_size_positive",
+          "value": "\"manual_payment_proofs\".\"size_bytes\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payment_events": {
+      "name": "payment_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_id": {
+          "name": "payment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_event_id": {
+          "name": "provider_event_id",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload_hash": {
+          "name": "payload_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processing_error": {
+          "name": "processing_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payment_events_provider_event_uidx": {
+          "name": "payment_events_provider_event_uidx",
+          "columns": [
+            {
+              "expression": "provider_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payment_events_payment_payload_uidx": {
+          "name": "payment_events_payment_payload_uidx",
+          "columns": [
+            {
+              "expression": "payment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "payload_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payment_events_unprocessed_idx": {
+          "name": "payment_events_unprocessed_idx",
+          "columns": [
+            {
+              "expression": "processed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "received_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_events_merchant_id_merchants_id_fk": {
+          "name": "payment_events_merchant_id_merchants_id_fk",
+          "tableFrom": "payment_events",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "payment_events_payment_id_payments_id_fk": {
+          "name": "payment_events_payment_id_payments_id_fk",
+          "tableFrom": "payment_events",
+          "tableTo": "payments",
+          "columnsFrom": [
+            "payment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.payments": {
+      "name": "payments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "payment_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "payment_method",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "payment_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PHP'"
+        },
+        "request_reference": {
+          "name": "request_reference",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_payment_id": {
+          "name": "provider_payment_id",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_reference": {
+          "name": "provider_reference",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_status": {
+          "name": "provider_status",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gateway_fee_basis_points": {
+          "name": "gateway_fee_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "platform_fee_cents": {
+          "name": "platform_fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_message": {
+          "name": "failure_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payments_request_reference_uidx": {
+          "name": "payments_request_reference_uidx",
+          "columns": [
+            {
+              "expression": "request_reference",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payments_provider_payment_id_uidx": {
+          "name": "payments_provider_payment_id_uidx",
+          "columns": [
+            {
+              "expression": "provider_payment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payments_booking_idx": {
+          "name": "payments_booking_idx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payments_merchant_status_created_idx": {
+          "name": "payments_merchant_status_created_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payments_merchant_id_merchants_id_fk": {
+          "name": "payments_merchant_id_merchants_id_fk",
+          "tableFrom": "payments",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "payments_booking_id_bookings_id_fk": {
+          "name": "payments_booking_id_bookings_id_fk",
+          "tableFrom": "payments",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "payments_amount_nonnegative": {
+          "name": "payments_amount_nonnegative",
+          "value": "\"payments\".\"amount_cents\" >= 0"
+        },
+        "payments_platform_fee_nonnegative": {
+          "name": "payments_platform_fee_nonnegative",
+          "value": "\"payments\".\"platform_fee_cents\" >= 0"
+        },
+        "payments_gateway_fee_range": {
+          "name": "payments_gateway_fee_range",
+          "value": "\"payments\".\"gateway_fee_basis_points\" >= 0 and \"payments\".\"gateway_fee_basis_points\" <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.refunds": {
+      "name": "refunds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_id": {
+          "name": "payment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "refund_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PHP'"
+        },
+        "provider_refund_id": {
+          "name": "provider_refund_id",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by_user_id": {
+          "name": "requested_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_message": {
+          "name": "failure_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "refunds_provider_refund_id_uidx": {
+          "name": "refunds_provider_refund_id_uidx",
+          "columns": [
+            {
+              "expression": "provider_refund_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "refunds_payment_idx": {
+          "name": "refunds_payment_idx",
+          "columns": [
+            {
+              "expression": "payment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "refunds_merchant_status_created_idx": {
+          "name": "refunds_merchant_status_created_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "refunds_merchant_id_merchants_id_fk": {
+          "name": "refunds_merchant_id_merchants_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "refunds_booking_id_bookings_id_fk": {
+          "name": "refunds_booking_id_bookings_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "refunds_payment_id_payments_id_fk": {
+          "name": "refunds_payment_id_payments_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "payments",
+          "columnsFrom": [
+            "payment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "refunds_requested_by_user_id_users_id_fk": {
+          "name": "refunds_requested_by_user_id_users_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "refunds_amount_positive": {
+          "name": "refunds_amount_positive",
+          "value": "\"refunds\".\"amount_cents\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.audit_events": {
+      "name": "audit_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_ip": {
+          "name": "source_ip",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "after": {
+          "name": "after",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_events_merchant_occurred_idx": {
+          "name": "audit_events_merchant_occurred_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_events_actor_occurred_idx": {
+          "name": "audit_events_actor_occurred_idx",
+          "columns": [
+            {
+              "expression": "actor_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_events_target_idx": {
+          "name": "audit_events_target_idx",
+          "columns": [
+            {
+              "expression": "target_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_events_merchant_id_merchants_id_fk": {
+          "name": "audit_events_merchant_id_merchants_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "audit_events_actor_user_id_users_id_fk": {
+          "name": "audit_events_actor_user_id_users_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "audit_events_booking_id_bookings_id_fk": {
+          "name": "audit_events_booking_id_bookings_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.court_subscription_usage": {
+      "name": "court_subscription_usage",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usage_date": {
+          "name": "usage_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "billable": {
+          "name": "billable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "unit_price_cents": {
+          "name": "unit_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "court_subscription_usage_court_date_uidx": {
+          "name": "court_subscription_usage_court_date_uidx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "usage_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_subscription_usage_merchant_date_idx": {
+          "name": "court_subscription_usage_merchant_date_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "usage_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "court_subscription_usage_merchant_id_merchants_id_fk": {
+          "name": "court_subscription_usage_merchant_id_merchants_id_fk",
+          "tableFrom": "court_subscription_usage",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "court_subscription_usage_court_id_courts_id_fk": {
+          "name": "court_subscription_usage_court_id_courts_id_fk",
+          "tableFrom": "court_subscription_usage",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "court_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "court_subscription_usage_billable_boolean": {
+          "name": "court_subscription_usage_billable_boolean",
+          "value": "\"court_subscription_usage\".\"billable\" in (0, 1)"
+        },
+        "court_subscription_usage_price_nonnegative": {
+          "name": "court_subscription_usage_price_nonnegative",
+          "value": "\"court_subscription_usage\".\"unit_price_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.merchant_subscriptions": {
+      "name": "merchant_subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "subscription_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'trialing'"
+        },
+        "monthly_court_price_cents": {
+          "name": "monthly_court_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_period_start": {
+          "name": "current_period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_period_end": {
+          "name": "current_period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grace_period_days": {
+          "name": "grace_period_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 7
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "merchant_subscriptions_merchant_period_uidx": {
+          "name": "merchant_subscriptions_merchant_period_uidx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "current_period_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "merchant_subscriptions_merchant_status_idx": {
+          "name": "merchant_subscriptions_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "merchant_subscriptions_merchant_id_merchants_id_fk": {
+          "name": "merchant_subscriptions_merchant_id_merchants_id_fk",
+          "tableFrom": "merchant_subscriptions",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "merchant_subscriptions_price_nonnegative": {
+          "name": "merchant_subscriptions_price_nonnegative",
+          "value": "\"merchant_subscriptions\".\"monthly_court_price_cents\" >= 0"
+        },
+        "merchant_subscriptions_valid_period": {
+          "name": "merchant_subscriptions_valid_period",
+          "value": "\"merchant_subscriptions\".\"current_period_start\" < \"merchant_subscriptions\".\"current_period_end\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.subscription_invoices": {
+      "name": "subscription_invoices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invoice_number": {
+          "name": "invoice_number",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "invoice_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "period_start": {
+          "name": "period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_count": {
+          "name": "court_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subtotal_cents": {
+          "name": "subtotal_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_cents": {
+          "name": "tax_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_cents": {
+          "name": "total_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_at": {
+          "name": "due_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "subscription_invoices_number_uidx": {
+          "name": "subscription_invoices_number_uidx",
+          "columns": [
+            {
+              "expression": "invoice_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "subscription_invoices_merchant_period_uidx": {
+          "name": "subscription_invoices_merchant_period_uidx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "subscription_invoices_merchant_status_idx": {
+          "name": "subscription_invoices_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "subscription_invoices_merchant_id_merchants_id_fk": {
+          "name": "subscription_invoices_merchant_id_merchants_id_fk",
+          "tableFrom": "subscription_invoices",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "subscription_invoices_court_count_nonnegative": {
+          "name": "subscription_invoices_court_count_nonnegative",
+          "value": "\"subscription_invoices\".\"court_count\" >= 0"
+        },
+        "subscription_invoices_amounts_nonnegative": {
+          "name": "subscription_invoices_amounts_nonnegative",
+          "value": "\"subscription_invoices\".\"subtotal_cents\" >= 0 and \"subscription_invoices\".\"tax_cents\" >= 0 and \"subscription_invoices\".\"total_cents\" >= 0"
+        },
+        "subscription_invoices_valid_period": {
+          "name": "subscription_invoices_valid_period",
+          "value": "\"subscription_invoices\".\"period_start\" < \"subscription_invoices\".\"period_end\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cancellation_policies": {
+      "name": "cancellation_policies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_cancellation_enabled": {
+          "name": "customer_cancellation_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "self_service_cutoff_minutes": {
+          "name": "self_service_cutoff_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 360
+        },
+        "no_show_grace_minutes": {
+          "name": "no_show_grace_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 15
+        },
+        "refund_tax": {
+          "name": "refund_tax",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "refund_merchant_fees": {
+          "name": "refund_merchant_fees",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "refund_gateway_fees": {
+          "name": "refund_gateway_fees",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "customer_visible_text": {
+          "name": "customer_visible_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "effective_at": {
+          "name": "effective_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cancellation_policies_site_version_uidx": {
+          "name": "cancellation_policies_site_version_uidx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "cancellation_policies_site_active_idx": {
+          "name": "cancellation_policies_site_active_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cancellation_policies_merchant_id_merchants_id_fk": {
+          "name": "cancellation_policies_merchant_id_merchants_id_fk",
+          "tableFrom": "cancellation_policies",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cancellation_policies_site_tenant_fk": {
+          "name": "cancellation_policies_site_tenant_fk",
+          "tableFrom": "cancellation_policies",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cancellation_policies_cutoff_nonnegative": {
+          "name": "cancellation_policies_cutoff_nonnegative",
+          "value": "\"cancellation_policies\".\"self_service_cutoff_minutes\" >= 0"
+        },
+        "cancellation_policies_grace_nonnegative": {
+          "name": "cancellation_policies_grace_nonnegative",
+          "value": "\"cancellation_policies\".\"no_show_grace_minutes\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cancellation_policy_tiers": {
+      "name": "cancellation_policy_tiers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy_id": {
+          "name": "policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minimum_minutes_before_start": {
+          "name": "minimum_minutes_before_start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refund_basis_points": {
+          "name": "refund_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cancellation_policy_tiers_threshold_uidx": {
+          "name": "cancellation_policy_tiers_threshold_uidx",
+          "columns": [
+            {
+              "expression": "policy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "minimum_minutes_before_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cancellation_policy_tiers_merchant_id_merchants_id_fk": {
+          "name": "cancellation_policy_tiers_merchant_id_merchants_id_fk",
+          "tableFrom": "cancellation_policy_tiers",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cancellation_policy_tiers_policy_id_cancellation_policies_id_fk": {
+          "name": "cancellation_policy_tiers_policy_id_cancellation_policies_id_fk",
+          "tableFrom": "cancellation_policy_tiers",
+          "tableTo": "cancellation_policies",
+          "columnsFrom": [
+            "policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cancellation_policy_tiers_minutes_nonnegative": {
+          "name": "cancellation_policy_tiers_minutes_nonnegative",
+          "value": "\"cancellation_policy_tiers\".\"minimum_minutes_before_start\" >= 0"
+        },
+        "cancellation_policy_tiers_refund_range": {
+          "name": "cancellation_policy_tiers_refund_range",
+          "value": "\"cancellation_policy_tiers\".\"refund_basis_points\" >= 0 and \"cancellation_policy_tiers\".\"refund_basis_points\" <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.court_blocks": {
+      "name": "court_blocks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "court_block_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_visible": {
+          "name": "customer_visible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "court_blocks_court_period_idx": {
+          "name": "court_blocks_court_period_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "court_blocks_merchant_id_merchants_id_fk": {
+          "name": "court_blocks_merchant_id_merchants_id_fk",
+          "tableFrom": "court_blocks",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_blocks_created_by_user_id_users_id_fk": {
+          "name": "court_blocks_created_by_user_id_users_id_fk",
+          "tableFrom": "court_blocks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "court_blocks_court_tenant_fk": {
+          "name": "court_blocks_court_tenant_fk",
+          "tableFrom": "court_blocks",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "court_blocks_valid_period": {
+          "name": "court_blocks_valid_period",
+          "value": "\"court_blocks\".\"starts_at\" < \"court_blocks\".\"ends_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.court_operating_hours": {
+      "name": "court_operating_hours",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_week": {
+          "name": "day_of_week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opens_at": {
+          "name": "opens_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closes_at": {
+          "name": "closes_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "court_operating_hours_period_uidx": {
+          "name": "court_operating_hours_period_uidx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day_of_week",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "opens_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "court_operating_hours_merchant_id_merchants_id_fk": {
+          "name": "court_operating_hours_merchant_id_merchants_id_fk",
+          "tableFrom": "court_operating_hours",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_operating_hours_court_tenant_fk": {
+          "name": "court_operating_hours_court_tenant_fk",
+          "tableFrom": "court_operating_hours",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "court_operating_hours_day_range": {
+          "name": "court_operating_hours_day_range",
+          "value": "\"court_operating_hours\".\"day_of_week\" between 0 and 6"
+        },
+        "court_operating_hours_valid_period": {
+          "name": "court_operating_hours_valid_period",
+          "value": "\"court_operating_hours\".\"opens_at\" < \"court_operating_hours\".\"closes_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.court_photos": {
+      "name": "court_photos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pathname": {
+          "name": "pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_cover": {
+          "name": "is_cover",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "court_photos_pathname_uidx": {
+          "name": "court_photos_pathname_uidx",
+          "columns": [
+            {
+              "expression": "pathname",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_photos_single_cover_uidx": {
+          "name": "court_photos_single_cover_uidx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"court_photos\".\"is_cover\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "court_photos_court_order_idx": {
+          "name": "court_photos_court_order_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sort_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "court_photos_merchant_id_merchants_id_fk": {
+          "name": "court_photos_merchant_id_merchants_id_fk",
+          "tableFrom": "court_photos",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "court_photos_created_by_user_id_users_id_fk": {
+          "name": "court_photos_created_by_user_id_users_id_fk",
+          "tableFrom": "court_photos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "court_photos_court_tenant_fk": {
+          "name": "court_photos_court_tenant_fk",
+          "tableFrom": "court_photos",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.courts": {
+      "name": "courts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "court_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "base_hourly_rate_cents": {
+          "name": "base_hourly_rate_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "surface_type": {
+          "name": "surface_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "indoor": {
+          "name": "indoor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "amenities": {
+          "name": "amenities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "courts_site_slug_uidx": {
+          "name": "courts_site_slug_uidx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"slug\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "courts_merchant_site_status_idx": {
+          "name": "courts_merchant_site_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "courts_merchant_id_merchants_id_fk": {
+          "name": "courts_merchant_id_merchants_id_fk",
+          "tableFrom": "courts",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "courts_site_tenant_fk": {
+          "name": "courts_site_tenant_fk",
+          "tableFrom": "courts",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "courts_merchant_id_id_key": {
+          "name": "courts_merchant_id_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "merchant_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "courts_base_hourly_rate_nonnegative": {
+          "name": "courts_base_hourly_rate_nonnegative",
+          "value": "\"courts\".\"base_hourly_rate_cents\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.merchant_site_assignments": {
+      "name": "merchant_site_assignments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "membership_id": {
+          "name": "membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "merchant_site_assignments_membership_site_uidx": {
+          "name": "merchant_site_assignments_membership_site_uidx",
+          "columns": [
+            {
+              "expression": "membership_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "merchant_site_assignments_merchant_site_idx": {
+          "name": "merchant_site_assignments_merchant_site_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "merchant_site_assignments_merchant_id_merchants_id_fk": {
+          "name": "merchant_site_assignments_merchant_id_merchants_id_fk",
+          "tableFrom": "merchant_site_assignments",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "merchant_site_assignments_membership_id_merchant_memberships_id_fk": {
+          "name": "merchant_site_assignments_membership_id_merchant_memberships_id_fk",
+          "tableFrom": "merchant_site_assignments",
+          "tableTo": "merchant_memberships",
+          "columnsFrom": [
+            "membership_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "merchant_site_assignments_site_tenant_fk": {
+          "name": "merchant_site_assignments_site_tenant_fk",
+          "tableFrom": "merchant_site_assignments",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.price_rules": {
+      "name": "price_rules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "price_rule_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_week": {
+          "name": "day_of_week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "special_date": {
+          "name": "special_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active_from": {
+          "name": "active_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active_until": {
+          "name": "active_until",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hourly_rate_cents": {
+          "name": "hourly_rate_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "price_rules_site_active_idx": {
+          "name": "price_rules_site_active_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "price_rules_court_active_idx": {
+          "name": "price_rules_court_active_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "price_rules_merchant_id_merchants_id_fk": {
+          "name": "price_rules_merchant_id_merchants_id_fk",
+          "tableFrom": "price_rules",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "price_rules_site_tenant_fk": {
+          "name": "price_rules_site_tenant_fk",
+          "tableFrom": "price_rules",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "price_rules_court_tenant_fk": {
+          "name": "price_rules_court_tenant_fk",
+          "tableFrom": "price_rules",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "price_rules_valid_period": {
+          "name": "price_rules_valid_period",
+          "value": "\"price_rules\".\"starts_at\" < \"price_rules\".\"ends_at\""
+        },
+        "price_rules_rate_nonnegative": {
+          "name": "price_rules_rate_nonnegative",
+          "value": "\"price_rules\".\"hourly_rate_cents\" >= 0"
+        },
+        "price_rules_day_range": {
+          "name": "price_rules_day_range",
+          "value": "\"price_rules\".\"day_of_week\" is null or \"price_rules\".\"day_of_week\" between 0 and 6"
+        },
+        "price_rules_type_fields": {
+          "name": "price_rules_type_fields",
+          "value": "(\"price_rules\".\"type\" = 'recurring' and \"price_rules\".\"day_of_week\" is not null and \"price_rules\".\"special_date\" is null) or (\"price_rules\".\"type\" = 'special_date' and \"price_rules\".\"special_date\" is not null) or (\"price_rules\".\"type\" = 'seasonal' and \"price_rules\".\"active_from\" is not null and \"price_rules\".\"active_until\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.schedule_overrides": {
+      "name": "schedule_overrides",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_id": {
+          "name": "court_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_closed": {
+          "name": "is_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "opens_at": {
+          "name": "opens_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closes_at": {
+          "name": "closes_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "schedule_overrides_site_date_idx": {
+          "name": "schedule_overrides_site_date_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "local_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schedule_overrides_court_date_idx": {
+          "name": "schedule_overrides_court_date_idx",
+          "columns": [
+            {
+              "expression": "court_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "local_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "schedule_overrides_merchant_id_merchants_id_fk": {
+          "name": "schedule_overrides_merchant_id_merchants_id_fk",
+          "tableFrom": "schedule_overrides",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "schedule_overrides_site_tenant_fk": {
+          "name": "schedule_overrides_site_tenant_fk",
+          "tableFrom": "schedule_overrides",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "schedule_overrides_court_tenant_fk": {
+          "name": "schedule_overrides_court_tenant_fk",
+          "tableFrom": "schedule_overrides",
+          "tableTo": "courts",
+          "columnsFrom": [
+            "merchant_id",
+            "court_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "schedule_overrides_valid_period": {
+          "name": "schedule_overrides_valid_period",
+          "value": "\"schedule_overrides\".\"is_closed\" or (\"schedule_overrides\".\"opens_at\" is not null and \"schedule_overrides\".\"closes_at\" is not null and \"schedule_overrides\".\"opens_at\" < \"schedule_overrides\".\"closes_at\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.site_operating_hours": {
+      "name": "site_operating_hours",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_week": {
+          "name": "day_of_week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opens_at": {
+          "name": "opens_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closes_at": {
+          "name": "closes_at",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "site_operating_hours_period_uidx": {
+          "name": "site_operating_hours_period_uidx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day_of_week",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "opens_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "site_operating_hours_merchant_id_merchants_id_fk": {
+          "name": "site_operating_hours_merchant_id_merchants_id_fk",
+          "tableFrom": "site_operating_hours",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "site_operating_hours_site_tenant_fk": {
+          "name": "site_operating_hours_site_tenant_fk",
+          "tableFrom": "site_operating_hours",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "site_operating_hours_day_range": {
+          "name": "site_operating_hours_day_range",
+          "value": "\"site_operating_hours\".\"day_of_week\" between 0 and 6"
+        },
+        "site_operating_hours_valid_period": {
+          "name": "site_operating_hours_valid_period",
+          "value": "\"site_operating_hours\".\"opens_at\" < \"site_operating_hours\".\"closes_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.site_photos": {
+      "name": "site_photos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pathname": {
+          "name": "pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_cover": {
+          "name": "is_cover",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "site_photos_pathname_uidx": {
+          "name": "site_photos_pathname_uidx",
+          "columns": [
+            {
+              "expression": "pathname",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "site_photos_single_cover_uidx": {
+          "name": "site_photos_single_cover_uidx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"site_photos\".\"is_cover\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "site_photos_site_order_idx": {
+          "name": "site_photos_site_order_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sort_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "site_photos_merchant_id_merchants_id_fk": {
+          "name": "site_photos_merchant_id_merchants_id_fk",
+          "tableFrom": "site_photos",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "site_photos_created_by_user_id_users_id_fk": {
+          "name": "site_photos_created_by_user_id_users_id_fk",
+          "tableFrom": "site_photos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "site_photos_site_tenant_fk": {
+          "name": "site_photos_site_tenant_fk",
+          "tableFrom": "site_photos",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "merchant_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "merchant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sites": {
+      "name": "sites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "merchant_id": {
+          "name": "merchant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "site_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address_line_1": {
+          "name": "address_line_1",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address_line_2": {
+          "name": "address_line_2",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "province": {
+          "name": "province",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country_code": {
+          "name": "country_code",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PH'"
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "numeric(9, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "numeric(9, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Asia/Manila'"
+        },
+        "contact_email": {
+          "name": "contact_email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_phone": {
+          "name": "contact_phone",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amenities": {
+          "name": "amenities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "policies": {
+          "name": "policies",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "booking_lead_minutes": {
+          "name": "booking_lead_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 60
+        },
+        "advance_booking_days": {
+          "name": "advance_booking_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "online_payment_enabled": {
+          "name": "online_payment_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "manual_payment_enabled": {
+          "name": "manual_payment_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "manual_reservation_mode": {
+          "name": "manual_reservation_mode",
+          "type": "manual_reservation_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'reserve_immediately'"
+        },
+        "manual_payment_deadline_minutes": {
+          "name": "manual_payment_deadline_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "manual_payment_instructions": {
+          "name": "manual_payment_instructions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manual_payment_qr_url": {
+          "name": "manual_payment_qr_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manual_payment_options": {
+          "name": "manual_payment_options",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "tax_inclusive": {
+          "name": "tax_inclusive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "tax_basis_points": {
+          "name": "tax_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sites_merchant_slug_uidx": {
+          "name": "sites_merchant_slug_uidx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"slug\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_merchant_status_idx": {
+          "name": "sites_merchant_status_idx",
+          "columns": [
+            {
+              "expression": "merchant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sites_merchant_id_merchants_id_fk": {
+          "name": "sites_merchant_id_merchants_id_fk",
+          "tableFrom": "sites",
+          "tableTo": "merchants",
+          "columnsFrom": [
+            "merchant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sites_merchant_id_id_key": {
+          "name": "sites_merchant_id_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "merchant_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "sites_booking_lead_nonnegative": {
+          "name": "sites_booking_lead_nonnegative",
+          "value": "\"sites\".\"booking_lead_minutes\" >= 0"
+        },
+        "sites_advance_days_positive": {
+          "name": "sites_advance_days_positive",
+          "value": "\"sites\".\"advance_booking_days\" > 0"
+        },
+        "sites_manual_deadline_positive": {
+          "name": "sites_manual_deadline_positive",
+          "value": "\"sites\".\"manual_payment_deadline_minutes\" > 0"
+        },
+        "sites_tax_basis_points_range": {
+          "name": "sites_tax_basis_points_range",
+          "value": "\"sites\".\"tax_basis_points\" >= 0 and \"sites\".\"tax_basis_points\" <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.court_allocation_kind": {
+      "name": "court_allocation_kind",
+      "schema": "public",
+      "values": [
+        "checkout_hold",
+        "booking",
+        "merchant_block"
+      ]
+    },
+    "public.court_block_type": {
+      "name": "court_block_type",
+      "schema": "public",
+      "values": [
+        "maintenance",
+        "private_event",
+        "temporary_closure"
+      ]
+    },
+    "public.booking_source": {
+      "name": "booking_source",
+      "schema": "public",
+      "values": [
+        "customer_web",
+        "merchant_walk_in",
+        "merchant_phone",
+        "merchant_complimentary"
+      ]
+    },
+    "public.booking_status": {
+      "name": "booking_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "pending_payment",
+        "pending_verification",
+        "confirmed",
+        "cancelled",
+        "expired",
+        "completed",
+        "no_show"
+      ]
+    },
+    "public.checkout_hold_status": {
+      "name": "checkout_hold_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "converted",
+        "expired",
+        "cancelled"
+      ]
+    },
+    "public.court_status": {
+      "name": "court_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "inactive",
+        "maintenance"
+      ]
+    },
+    "public.discount_type": {
+      "name": "discount_type",
+      "schema": "public",
+      "values": [
+        "fixed",
+        "percentage"
+      ]
+    },
+    "public.invoice_status": {
+      "name": "invoice_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "issued",
+        "paid",
+        "past_due",
+        "void"
+      ]
+    },
+    "public.manual_proof_status": {
+      "name": "manual_proof_status",
+      "schema": "public",
+      "values": [
+        "submitted",
+        "approved",
+        "rejected"
+      ]
+    },
+    "public.manual_reservation_mode": {
+      "name": "manual_reservation_mode",
+      "schema": "public",
+      "values": [
+        "reserve_immediately",
+        "reserve_after_verification"
+      ]
+    },
+    "public.merchant_role": {
+      "name": "merchant_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "site_manager",
+        "booking_staff",
+        "cashier",
+        "viewer"
+      ]
+    },
+    "public.merchant_status": {
+      "name": "merchant_status",
+      "schema": "public",
+      "values": [
+        "onboarding",
+        "active",
+        "suspended",
+        "archived"
+      ]
+    },
+    "public.payment_method": {
+      "name": "payment_method",
+      "schema": "public",
+      "values": [
+        "maya_qrph",
+        "manual_bank_transfer",
+        "manual_ewallet",
+        "cash",
+        "complimentary"
+      ]
+    },
+    "public.payment_provider": {
+      "name": "payment_provider",
+      "schema": "public",
+      "values": [
+        "maya",
+        "manual",
+        "none"
+      ]
+    },
+    "public.payment_status": {
+      "name": "payment_status",
+      "schema": "public",
+      "values": [
+        "unpaid",
+        "pending",
+        "paid",
+        "rejected",
+        "failed",
+        "partially_refunded",
+        "refunded"
+      ]
+    },
+    "public.platform_role": {
+      "name": "platform_role",
+      "schema": "public",
+      "values": [
+        "admin"
+      ]
+    },
+    "public.price_rule_type": {
+      "name": "price_rule_type",
+      "schema": "public",
+      "values": [
+        "recurring",
+        "special_date",
+        "seasonal"
+      ]
+    },
+    "public.refund_status": {
+      "name": "refund_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "public.site_status": {
+      "name": "site_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "active",
+        "inactive"
+      ]
+    },
+    "public.subscription_status": {
+      "name": "subscription_status",
+      "schema": "public",
+      "values": [
+        "trialing",
+        "active",
+        "past_due",
+        "suspended",
+        "cancelled"
+      ]
+    },
+    "public.user_status": {
+      "name": "user_status",
+      "schema": "public",
+      "values": [
+        "invited",
+        "active",
+        "suspended"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

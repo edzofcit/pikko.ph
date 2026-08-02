@@ -33,7 +33,11 @@ export const merchants = pgTable(
     currency: varchar("currency", { length: 3 }).default("PHP").notNull(),
     contactEmail: varchar("contact_email", { length: 320 }),
     contactPhone: varchar("contact_phone", { length: 40 }),
+    description: text("description"),
     logoUrl: text("logo_url"),
+    logoPathname: text("logo_pathname"),
+    coverUrl: text("cover_url"),
+    coverPathname: text("cover_pathname"),
     subscriptionStatus: subscriptionStatusEnum("subscription_status")
       .default("trialing")
       .notNull(),

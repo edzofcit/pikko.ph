@@ -33,7 +33,7 @@ const groups = [
     label: "Management",
     items: [
       { href: "/merchant/team", label: "Team", icon: "♧", permission: "manage_staff" },
-      { href: "/merchant/public", label: "Public page", icon: "◎", disabled: true },
+      { href: "/merchant/public", label: "Merchant page", icon: "◎", permission: "manage_courts" },
       { href: "/merchant/settings", label: "Settings", icon: "⚙", disabled: true },
     ],
   },

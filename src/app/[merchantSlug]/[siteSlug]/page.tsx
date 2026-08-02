@@ -133,8 +133,6 @@ export default async function PublicSitePage({
           </form>
         </div>
 
-        {hasMapLocation ? <SiteLocationMap latitude={availability.site.latitude!} longitude={availability.site.longitude!} siteName={availability.site.name} address={address} tileUrl={process.env.OSM_TILE_URL} /> : null}
-
         <ol className="mt-8 grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black sm:max-w-2xl">
           <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">1 · Choose time</li>
           <li className="px-3 py-3 text-center text-[var(--text-muted)]">2 · Your details</li>
@@ -219,6 +217,8 @@ export default async function PublicSitePage({
             </div>
           )}
         </div>
+
+        {hasMapLocation ? <SiteLocationMap latitude={availability.site.latitude!} longitude={availability.site.longitude!} siteName={availability.site.name} address={address} tileUrl={process.env.OSM_TILE_URL} /> : null}
       </section>
     </main>
   );
