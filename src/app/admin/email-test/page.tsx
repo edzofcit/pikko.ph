@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { requirePlatformAdmin } from "@/lib/auth/access";
+import { adminNavigation } from "@/lib/admin/navigation";
 import { sendAdminTestEmail } from "./actions";
 
 export const metadata: Metadata = { title: "Email diagnostics" };
@@ -38,10 +39,7 @@ export default async function AdminEmailTestPage({
       eyebrow="Platform administration · Email diagnostics"
       title="Test the server-side mailer."
       description="Run controlled Resend checks without exposing the API key or allowing arbitrary recipients."
-      navigation={[
-        { href: "/admin", label: "Admin dashboard" },
-        { href: "/merchant", label: "Merchant mode" },
-      ]}
+      navigation={adminNavigation}
       metrics={[
         { label: "Provider", value: "Resend", note: "Vercel Marketplace integration" },
         { label: "Runtime", value: "Server", note: "API key is never sent to the browser" },

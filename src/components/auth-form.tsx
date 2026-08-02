@@ -255,7 +255,7 @@ export function AuthForm({
         </p>
       ) : (
         <p className="mt-5 text-center text-xs leading-5 text-[var(--text-muted)]">
-          Only the verified Google account for eddie@dxform.ph is authorized.
+          Access is restricted to authorized platform administrators.
         </p>
       )}
     </form>

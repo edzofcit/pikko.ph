@@ -138,6 +138,7 @@ export default async function CheckoutReviewPage({
                 starts={selectedSlots.map((slot) => slot.startsAt)}
                 deadlineMinutes={availability.site.manualPaymentDeadlineMinutes}
                 reserveImmediately={availability.site.manualReservationMode === "reserve_immediately"}
+                paymentOptions={availability.site.manualPaymentOptions}
                 customer={
                   signedInUser
                     ? {

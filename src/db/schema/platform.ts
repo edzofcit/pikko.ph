@@ -34,6 +34,10 @@ export const merchantSubscriptions = pgTable(
     ...timestamps(),
   },
   (table) => [
+    uniqueIndex("merchant_subscriptions_merchant_period_uidx").on(
+      table.merchantId,
+      table.currentPeriodStart,
+    ),
     index("merchant_subscriptions_merchant_status_idx").on(
       table.merchantId,
       table.status,
@@ -105,6 +109,10 @@ export const subscriptionInvoices = pgTable(
   },
   (table) => [
     uniqueIndex("subscription_invoices_number_uidx").on(table.invoiceNumber),
+    uniqueIndex("subscription_invoices_merchant_period_uidx").on(
+      table.merchantId,
+      table.periodStart,
+    ),
     index("subscription_invoices_merchant_status_idx").on(
       table.merchantId,
       table.status,

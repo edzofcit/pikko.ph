@@ -1,0 +1,1 @@
+ALTER TABLE "sites" ADD COLUMN "manual_payment_options" jsonb DEFAULT '[]'::jsonb NOT NULL;

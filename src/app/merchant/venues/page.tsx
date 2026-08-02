@@ -1,11 +1,16 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatMerchantRole } from "@/lib/auth/permissions";
+import {
+  MANUAL_PAYMENT_PROVIDERS,
+  normalizeManualPaymentOptions,
+} from "@/lib/manual-payment/options";
 import {
   createCourt,
   createSite,
@@ -53,6 +58,7 @@ export default async function MerchantVenuesPage({
             manualReservationMode: sites.manualReservationMode,
             manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
             manualPaymentInstructions: sites.manualPaymentInstructions,
+            manualPaymentOptions: sites.manualPaymentOptions,
           })
           .from(sites)
           .where(
@@ -86,7 +92,8 @@ export default async function MerchantVenuesPage({
   const isOwner = access.membership.role === "owner";
 
   const feedbackKey = (query.success ?? query.error) as keyof typeof feedback;
-  const feedbackMessage = feedback[feedbackKey];
+  const feedbackMessage =
+    feedback[feedbackKey] ?? query.success ?? query.error;
   const feedbackIsError = Boolean(query.error);
 
   return (
@@ -218,6 +225,9 @@ export default async function MerchantVenuesPage({
         <div className="divide-y divide-[var(--line)]">
           {venueSites.map((site) => {
             const siteCourts = venueCourts.filter((court) => court.siteId === site.id);
+            const paymentOptions = normalizeManualPaymentOptions(
+              site.manualPaymentOptions,
+            );
             return (
               <article key={site.id} className="px-5 py-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -294,6 +304,74 @@ export default async function MerchantVenuesPage({
                       Save payment settings
                     </button>
                   </form>
+                  <div className="mt-6 border-t border-[var(--line)] pt-5">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">
+                      Customer QR payment options
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                      Upload one QR image per channel. Configured channels appear as selectable options during manual checkout.
+                    </p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {MANUAL_PAYMENT_PROVIDERS.map((provider) => {
+                        const currentOption = paymentOptions.find(
+                          (option) => option.provider === provider.id,
+                        );
+                        return (
+                          <div key={provider.id} className="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-black">{provider.label}</p>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${currentOption ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                                {currentOption ? "Visible" : "Not set"}
+                              </span>
+                            </div>
+                            {currentOption ? (
+                              <Image
+                                src={currentOption.qrImageUrl}
+                                alt={`${provider.label} payment QR`}
+                                width={500}
+                                height={500}
+                                sizes="240px"
+                                className="mt-3 aspect-square w-full rounded-lg border border-[var(--line)] bg-white object-contain"
+                              />
+                            ) : null}
+                            <form
+                              action={`/api/merchant/sites/${site.id}/payment-qr`}
+                              method="post"
+                              encType="multipart/form-data"
+                              className="mt-3 space-y-3"
+                            >
+                              <input type="hidden" name="provider" value={provider.id} />
+                              <input type="hidden" name="operation" value="upload" />
+                              <input
+                                type="file"
+                                name="qrImage"
+                                accept="image/jpeg,image/png,image/webp"
+                                required
+                                className="block w-full text-xs file:mr-2 file:rounded-full file:border-0 file:bg-[var(--forest)] file:px-3 file:py-2 file:text-xs file:font-black file:text-white"
+                              />
+                              <button className="w-full rounded-full bg-[var(--forest)] px-3 py-2 text-xs font-black text-white">
+                                {currentOption ? "Replace QR image" : "Upload QR image"}
+                              </button>
+                            </form>
+                            {currentOption ? (
+                              <form
+                                action={`/api/merchant/sites/${site.id}/payment-qr`}
+                                method="post"
+                                className="mt-2"
+                              >
+                                <input type="hidden" name="provider" value={provider.id} />
+                                <input type="hidden" name="operation" value="remove" />
+                                <button className="w-full rounded-full border border-red-200 px-3 py-2 text-xs font-black text-red-700">
+                                  Remove option
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">JPG, PNG, or WebP · maximum 3 MB per image.</p>
+                  </div>
                 </details>
                 {siteCourts.length > 0 ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

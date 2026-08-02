@@ -92,6 +92,7 @@ export default async function MerchantPage() {
       description={`${role} access${siteNames ? ` for ${siteNames}` : ""}. Your role controls every dashboard page and server action.`}
       navigation={[
         { href: "/customer", label: "Customer mode" },
+        { href: "/account/security", label: "Security" },
         ...(canOpenBookings
           ? [{ href: "/merchant/schedule", label: "Schedule" }]
           : []),

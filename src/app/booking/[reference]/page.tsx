@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ManualPaymentQrSelector } from "@/components/manual-payment-qr-selector";
 import { getDb } from "@/db";
 import {
   bookingAccessTokens,
@@ -12,11 +13,16 @@ import {
   customers,
   manualPaymentProofs,
   merchants,
+  payments,
   sites,
 } from "@/db/schema";
 import { formatPeso } from "@/lib/money";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
 import { syncCurrentUser } from "@/lib/auth/access";
+import {
+  isManualPaymentProvider,
+  normalizeManualPaymentOptions,
+} from "@/lib/manual-payment/options";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -53,6 +59,7 @@ const bookingFields = {
   timezone: sites.timezone,
   manualReservationMode: sites.manualReservationMode,
   manualPaymentInstructions: sites.manualPaymentInstructions,
+  manualPaymentOptions: sites.manualPaymentOptions,
 };
 
 export default async function GuestBookingPage({
@@ -126,41 +133,69 @@ export default async function GuestBookingPage({
 
   if (!booking) notFound();
 
-  const items = await db
-    .select({
-      id: bookingItems.id,
-      startsAt: bookingItems.startsAt,
-      endsAt: bookingItems.endsAt,
-      lineTotalCents: bookingItems.lineTotalCents,
-      courtName: courts.name,
-    })
-    .from(bookingItems)
-    .innerJoin(courts, eq(courts.id, bookingItems.courtId))
-    .where(
-      and(
-        eq(bookingItems.bookingId, booking.id),
-        eq(bookingItems.merchantId, booking.merchantId),
-      ),
-    )
-    .orderBy(asc(bookingItems.startsAt));
-
-  const proofs = await db
-    .select({
-      id: manualPaymentProofs.id,
-      status: manualPaymentProofs.status,
-      originalFilename: manualPaymentProofs.originalFilename,
-      customerNotes: manualPaymentProofs.customerNotes,
-      rejectionReason: manualPaymentProofs.rejectionReason,
-      createdAt: manualPaymentProofs.createdAt,
-    })
-    .from(manualPaymentProofs)
-    .where(
-      and(
-        eq(manualPaymentProofs.bookingId, booking.id),
-        eq(manualPaymentProofs.merchantId, booking.merchantId),
-      ),
-    )
-    .orderBy(asc(manualPaymentProofs.createdAt));
+  const [items, proofs, paymentRows] = await Promise.all([
+    db
+      .select({
+        id: bookingItems.id,
+        startsAt: bookingItems.startsAt,
+        endsAt: bookingItems.endsAt,
+        lineTotalCents: bookingItems.lineTotalCents,
+        courtName: courts.name,
+      })
+      .from(bookingItems)
+      .innerJoin(courts, eq(courts.id, bookingItems.courtId))
+      .where(
+        and(
+          eq(bookingItems.bookingId, booking.id),
+          eq(bookingItems.merchantId, booking.merchantId),
+        ),
+      )
+      .orderBy(asc(bookingItems.startsAt)),
+    db
+      .select({
+        id: manualPaymentProofs.id,
+        status: manualPaymentProofs.status,
+        originalFilename: manualPaymentProofs.originalFilename,
+        customerNotes: manualPaymentProofs.customerNotes,
+        rejectionReason: manualPaymentProofs.rejectionReason,
+        createdAt: manualPaymentProofs.createdAt,
+      })
+      .from(manualPaymentProofs)
+      .where(
+        and(
+          eq(manualPaymentProofs.bookingId, booking.id),
+          eq(manualPaymentProofs.merchantId, booking.merchantId),
+        ),
+      )
+      .orderBy(asc(manualPaymentProofs.createdAt)),
+    db
+      .select({ metadata: payments.metadata })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.bookingId, booking.id),
+          eq(payments.merchantId, booking.merchantId),
+          eq(payments.provider, "manual"),
+        ),
+      )
+      .limit(1),
+  ]);
+  const paymentMetadata = paymentRows[0]?.metadata;
+  const selectedProviderValue = String(
+    paymentMetadata?.manualPaymentProvider ?? "",
+  );
+  const selectedProvider = isManualPaymentProvider(selectedProviderValue)
+    ? selectedProviderValue
+    : null;
+  const paymentOptions = normalizeManualPaymentOptions([
+    ...normalizeManualPaymentOptions(booking.manualPaymentOptions),
+    {
+      provider: selectedProviderValue,
+      label: paymentMetadata?.manualPaymentLabel,
+      qrImageUrl: paymentMetadata?.manualPaymentQrUrl,
+      qrImagePathname: paymentMetadata?.manualPaymentQrPathname,
+    },
+  ]);
 
   const deadlinePassed =
     booking.paymentDueAt !== null && booking.paymentDueAt <= new Date();
@@ -233,6 +268,14 @@ export default async function GuestBookingPage({
                 Payment instructions
               </p>
               <h2 className="mt-2 text-2xl font-black">Pay the venue directly</h2>
+              {paymentOptions.length ? (
+                <div className="mt-5">
+                  <ManualPaymentQrSelector
+                    options={paymentOptions}
+                    initialProvider={selectedProvider}
+                  />
+                </div>
+              ) : null}
               <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--text-muted)]">
                 {booking.manualPaymentInstructions ||
                   "Contact the venue using your booking reference for its current payment instructions."}

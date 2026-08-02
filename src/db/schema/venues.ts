@@ -26,6 +26,7 @@ import {
   siteStatusEnum,
 } from "./enums";
 import { merchantMemberships, merchants, users } from "./identity";
+import type { ManualPaymentOption } from "@/lib/manual-payment/options";
 
 export const sites = pgTable(
   "sites",
@@ -65,6 +66,10 @@ export const sites = pgTable(
       .notNull(),
     manualPaymentInstructions: text("manual_payment_instructions"),
     manualPaymentQrUrl: text("manual_payment_qr_url"),
+    manualPaymentOptions: jsonb("manual_payment_options")
+      .$type<ManualPaymentOption[]>()
+      .default([])
+      .notNull(),
     taxInclusive: boolean("tax_inclusive").default(true).notNull(),
     taxBasisPoints: integer("tax_basis_points").default(0).notNull(),
     ...timestamps(),

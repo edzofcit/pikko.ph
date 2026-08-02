@@ -22,6 +22,8 @@ import {
   siteOperatingHours,
   sites,
 } from "@/db/schema";
+import type { ManualPaymentOption } from "@/lib/manual-payment/options";
+import { normalizeManualPaymentOptions } from "@/lib/manual-payment/options";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -79,6 +81,7 @@ export type SiteAvailability = {
     manualReservationMode: "reserve_immediately" | "reserve_after_verification";
     manualPaymentDeadlineMinutes: number;
     manualPaymentInstructions: string | null;
+    manualPaymentOptions: ManualPaymentOption[];
   };
   date: string;
   earliestDate: string;
@@ -267,6 +270,7 @@ export async function getSiteAvailability(
       manualReservationMode: sites.manualReservationMode,
       manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
       manualPaymentInstructions: sites.manualPaymentInstructions,
+      manualPaymentOptions: sites.manualPaymentOptions,
     })
     .from(sites)
     .innerJoin(merchants, eq(sites.merchantId, merchants.id))
@@ -339,6 +343,9 @@ export async function getSiteAvailability(
         manualReservationMode: venue.manualReservationMode,
         manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
         manualPaymentInstructions: venue.manualPaymentInstructions,
+        manualPaymentOptions: normalizeManualPaymentOptions(
+          venue.manualPaymentOptions,
+        ),
       },
       date,
       earliestDate,
@@ -558,6 +565,9 @@ export async function getSiteAvailability(
       manualReservationMode: venue.manualReservationMode,
       manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
       manualPaymentInstructions: venue.manualPaymentInstructions,
+      manualPaymentOptions: normalizeManualPaymentOptions(
+        venue.manualPaymentOptions,
+      ),
     },
     date,
     earliestDate,

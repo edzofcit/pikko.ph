@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { formatPeso } from "@/lib/money";
+import { pikkoEmailSender } from "./sender";
 
 type BookingEmailSlot = {
   startsAt: Date;
@@ -63,8 +64,7 @@ export async function sendBookingConfirmationEmail(
   }
 
   const resend = new Resend(apiKey);
-  const from =
-    process.env.EMAIL_FROM?.trim() || "Pikko.ph <onboarding@resend.dev>";
+  const from = pikkoEmailSender();
   const lines = scheduleLines(booking.slots, booking.timezone);
   const safeUrl = escapeHtml(booking.bookingUrl);
   const instructions = booking.manualPaymentInstructions?.trim();

@@ -1,0 +1,124 @@
+import { desc, sql } from "drizzle-orm";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { getDb } from "@/db";
+import { bookings, courts, merchants, sites } from "@/db/schema";
+import { adminNavigation } from "@/lib/admin/navigation";
+import { requirePlatformAdmin } from "@/lib/auth/access";
+import { formatPeso } from "@/lib/money";
+import {
+  manuallyOnboardMerchant,
+  updateMerchantCommercialSettings,
+} from "../actions";
+
+export const metadata: Metadata = { title: "Manage merchants" };
+export const dynamic = "force-dynamic";
+
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
+    dateStyle: "medium",
+  }).format(value);
+}
+
+function trialNote(status: string, trialEndsAt: Date) {
+  if (status !== "trialing") return status.replaceAll("_", " ");
+  const days = Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000));
+  return `${days} trial ${days === 1 ? "day" : "days"} remaining`;
+}
+
+export default async function AdminMerchantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
+  const [, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
+  const db = getDb();
+  const merchantRows = await db
+    .select({
+      id: merchants.id,
+      displayName: merchants.displayName,
+      legalName: merchants.legalName,
+      slug: merchants.slug,
+      contactEmail: merchants.contactEmail,
+      status: merchants.status,
+      subscriptionStatus: merchants.subscriptionStatus,
+      trialEndsAt: merchants.trialEndsAt,
+      monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
+      gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
+      siteCount: sql<number>`(select count(*)::int from ${sites} where ${sites.merchantId} = ${merchants.id})`.mapWith(Number),
+      courtCount: sql<number>`(select count(*)::int from ${courts} where ${courts.merchantId} = ${merchants.id})`.mapWith(Number),
+      bookingCount: sql<number>`(select count(*)::int from ${bookings} where ${bookings.merchantId} = ${merchants.id})`.mapWith(Number),
+    })
+    .from(merchants)
+    .orderBy(desc(merchants.createdAt));
+
+  return (
+    <DashboardShell
+      eyebrow="Platform administration"
+      title="Merchant management"
+      description="Onboard operators, review their sites and courts, and configure subscription and gateway rates."
+      navigation={adminNavigation}
+      metrics={[
+        { label: "Merchants", value: String(merchantRows.length), note: "All tenant accounts" },
+        { label: "Trialing", value: String(merchantRows.filter((row) => row.subscriptionStatus === "trialing").length), note: "14-day trial" },
+        { label: "Paid", value: String(merchantRows.filter((row) => row.subscriptionStatus === "active").length), note: "Active subscriptions" },
+        { label: "Default rate", value: formatPeso(59900), note: "Per active court / month" },
+      ]}
+    >
+      {query.success || query.error ? (
+        <p role={query.error ? "alert" : "status"} className={`mt-6 rounded-2xl border px-5 py-4 text-sm font-bold ${query.error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
+          {query.error ?? query.success}
+        </p>
+      ) : null}
+
+      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-5 sm:p-6">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">Manual onboarding</p>
+        <h2 className="mt-2 text-xl font-black">Create a merchant and owner login</h2>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Pikko creates a 14-day trial and emails a high-entropy temporary password to the owner.</p>
+        <form action={manuallyOnboardMerchant} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <label className="text-xs font-black">Merchant display name<input name="displayName" required minLength={2} maxLength={160} className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal" /></label>
+          <label className="text-xs font-black">Legal name <span className="font-normal">(optional)</span><input name="legalName" maxLength={200} className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal" /></label>
+          <label className="text-xs font-black">Owner full name<input name="ownerName" required minLength={2} maxLength={160} className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal" /></label>
+          <label className="text-xs font-black">Owner email<input name="ownerEmail" type="email" required maxLength={320} className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal" /></label>
+          <label className="text-xs font-black">Contact phone <span className="font-normal">(optional)</span><input name="contactPhone" type="tel" maxLength={40} className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-normal" /></label>
+          <div className="flex items-end"><button className="w-full rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">Create merchant & email access</button></div>
+        </form>
+      </section>
+
+      <section className="mt-6 space-y-4">
+        {merchantRows.map((merchant) => (
+          <article key={merchant.id} className="rounded-2xl border border-[var(--line)] bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-black">{merchant.displayName}</h2>
+                  <span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-xs font-black uppercase text-[var(--forest)]">{merchant.status}</span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{merchant.contactEmail ?? `/${merchant.slug}`} · {trialNote(merchant.subscriptionStatus, merchant.trialEndsAt)} · trial ends {formatDate(merchant.trialEndsAt)}</p>
+              </div>
+              <Link href={`/admin/merchants/${merchant.id}`} className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-black text-[var(--forest)]">View sites & courts</Link>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-[var(--paper)] p-3"><p className="text-xs text-[var(--text-muted)]">Sites</p><p className="mt-1 font-black">{merchant.siteCount}</p></div>
+              <div className="rounded-xl bg-[var(--paper)] p-3"><p className="text-xs text-[var(--text-muted)]">Courts</p><p className="mt-1 font-black">{merchant.courtCount}</p></div>
+              <div className="rounded-xl bg-[var(--paper)] p-3"><p className="text-xs text-[var(--text-muted)]">Bookings</p><p className="mt-1 font-black">{merchant.bookingCount}</p></div>
+            </div>
+
+            <form action={updateMerchantCommercialSettings} className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
+              <input type="hidden" name="merchantId" value={merchant.id} />
+              <input type="hidden" name="returnTo" value="/admin/merchants" />
+              <label className="text-xs font-bold">Merchant status<select name="status" defaultValue={merchant.status} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal"><option value="onboarding">Onboarding</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select></label>
+              <label className="text-xs font-bold">Subscription<select name="subscriptionStatus" defaultValue={merchant.subscriptionStatus} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal"><option value="trialing">Trialing</option><option value="active">Paid / active</option><option value="past_due">Past due</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
+              <label className="text-xs font-bold">Per court / month (PHP)<input name="monthlyCourtPrice" type="number" min="0" max="1000000" step="0.01" defaultValue={(merchant.monthlyCourtPriceCents / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" /></label>
+              <label className="text-xs font-bold">Gateway fee (%)<input name="gatewayFeePercentage" type="number" min="0" max="100" step="0.01" defaultValue={(merchant.gatewayFeeBasisPoints / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" /></label>
+              <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">Save settings</button>
+            </form>
+          </article>
+        ))}
+      </section>
+    </DashboardShell>
+  );
+}

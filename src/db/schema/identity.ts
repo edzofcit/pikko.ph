@@ -37,8 +37,11 @@ export const merchants = pgTable(
     subscriptionStatus: subscriptionStatusEnum("subscription_status")
       .default("trialing")
       .notNull(),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP + interval '14 days'`)
+      .notNull(),
     monthlyCourtPriceCents: integer("monthly_court_price_cents")
-      .default(0)
+      .default(59900)
       .notNull(),
     gatewayFeeBasisPoints: integer("gateway_fee_basis_points")
       .default(0)

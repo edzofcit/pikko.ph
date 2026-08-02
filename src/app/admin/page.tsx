@@ -11,6 +11,7 @@ import {
   sites,
 } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/access";
+import { adminNavigation } from "@/lib/admin/navigation";
 import { formatPeso } from "@/lib/money";
 import { updateMerchantCommercialSettings } from "./actions";
 
@@ -111,11 +112,7 @@ export default async function AdminPage({
       eyebrow="Pikko.ph platform administration"
       title={`Marketplace overview, ${user.fullName}.`}
       description="Live platform operations across merchants, subscriptions, courts, bookings, payment verification, and configurable commercial terms."
-      navigation={[
-        { href: "/admin/email-test", label: "Email diagnostics" },
-        { href: "/customer", label: "Customer mode" },
-        { href: "/merchant", label: "Merchant mode" },
-      ]}
+      navigation={adminNavigation}
       metrics={[
         { label: "Active merchants", value: String(activeMerchants), note: `${merchantRows.length} total merchant accounts` },
         { label: "Billable courts", value: String(billableCourts), note: "Excludes cancelled subscriptions" },

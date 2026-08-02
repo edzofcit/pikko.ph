@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { Resend } from "resend";
+import { pikkoEmailSender } from "@/lib/email/sender";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 
 type TestMode = "provider" | "admin";
@@ -47,7 +48,7 @@ export async function sendAdminTestEmail(formData: FormData) {
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send(
       {
-        from: "Pikko.ph <onboarding@resend.dev>",
+        from: pikkoEmailSender(),
         to: recipient,
         subject: "Pikko.ph server-side mailer test",
         text: [

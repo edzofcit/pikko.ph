@@ -14,6 +14,12 @@ function addDays(value: string, days: number) {
     .slice(0, 10);
 }
 
+function mondayOfWeek(value: string) {
+  const day = new Date(`${value}T00:00:00Z`).getUTCDay();
+  const daysSinceMonday = (day + 6) % 7;
+  return addDays(value, -daysSinceMonday);
+}
+
 function dateLabel(value: string, earliestDate: string) {
   const date = new Date(`${value}T00:00:00Z`);
   const shortDate = new Intl.DateTimeFormat("en-PH", {
@@ -46,9 +52,23 @@ export default async function PublicSitePage({
   const address = `${availability.site.addressLine1}, ${availability.site.city}${
     availability.site.province ? `, ${availability.site.province}` : ""
   }`;
+  const calendarWeekStart = mondayOfWeek(availability.date);
+  const quickDateStart =
+    calendarWeekStart < availability.earliestDate
+      ? availability.earliestDate
+      : calendarWeekStart;
   const dateOptions = Array.from({ length: 7 }, (_, index) =>
-    addDays(availability.earliestDate, index),
+    addDays(quickDateStart, index),
   ).filter((value) => value <= availability.latestDate);
+  const previousWeekCandidate = addDays(calendarWeekStart, -1);
+  const previousWeekDate =
+    previousWeekCandidate >= availability.earliestDate
+      ? previousWeekCandidate
+      : null;
+  const nextWeekCandidate = addDays(calendarWeekStart, 7);
+  const nextWeekDate =
+    nextWeekCandidate <= availability.latestDate ? nextWeekCandidate : null;
+  const sitePath = `/${availability.merchant.slug}/${availability.site.slug}`;
   const availableSlotCount = availability.courts.reduce(
     (total, court) => total + court.slots.length,
     0,
@@ -104,13 +124,38 @@ export default async function PublicSitePage({
         </ol>
 
         <div className="mt-6">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">Quick date</p>
               <p className="mt-1 text-sm font-semibold text-[var(--forest)]">
                 {availableSlotCount} open {availableSlotCount === 1 ? "slot" : "slots"} on the selected date
               </p>
             </div>
+            <nav aria-label="Change quick-date week" className="flex items-center gap-2">
+              {previousWeekDate ? (
+                <Link
+                  href={`${sitePath}?date=${previousWeekDate}`}
+                  aria-label="Previous week"
+                  className="inline-flex size-9 items-center justify-center rounded-full border border-[var(--line)] bg-white text-sm font-black text-[var(--forest)] hover:border-[var(--forest)]"
+                >
+                  ←
+                </Link>
+              ) : (
+                <span aria-hidden="true" className="inline-flex size-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream)] text-sm text-[var(--text-muted)] opacity-50">←</span>
+              )}
+              <span className="text-xs font-black text-[var(--forest)]">Selected week</span>
+              {nextWeekDate ? (
+                <Link
+                  href={`${sitePath}?date=${nextWeekDate}`}
+                  aria-label="Next week"
+                  className="inline-flex size-9 items-center justify-center rounded-full border border-[var(--line)] bg-white text-sm font-black text-[var(--forest)] hover:border-[var(--forest)]"
+                >
+                  →
+                </Link>
+              ) : (
+                <span aria-hidden="true" className="inline-flex size-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream)] text-sm text-[var(--text-muted)] opacity-50">→</span>
+              )}
+            </nav>
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
             {dateOptions.map((value) => {
@@ -119,7 +164,7 @@ export default async function PublicSitePage({
               return (
                 <Link
                   key={value}
-                  href={`/${availability.merchant.slug}/${availability.site.slug}?date=${value}`}
+                  href={`${sitePath}?date=${value}`}
                   aria-current={selected ? "date" : undefined}
                   className={`min-w-20 shrink-0 rounded-2xl border px-4 py-3 text-center transition ${
                     selected
