@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { sitePhotos } from "@/db/schema";
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { SlotPicker } from "./slot-picker";
+import { SiteLocationMap } from "@/components/site-location-map";
 
 export const metadata: Metadata = { title: "Court availability" };
 export const dynamic = "force-dynamic";
@@ -61,9 +62,7 @@ export default async function PublicSitePage({
   const address = `${availability.site.addressLine1}, ${availability.site.city}${
     availability.site.province ? `, ${availability.site.province}` : ""
   }`;
-  const mapUrl = availability.site.latitude && availability.site.longitude
-    ? `https://www.openstreetmap.org/?mlat=${encodeURIComponent(availability.site.latitude)}&mlon=${encodeURIComponent(availability.site.longitude)}#map=17/${encodeURIComponent(availability.site.latitude)}/${encodeURIComponent(availability.site.longitude)}`
-    : null;
+  const hasMapLocation = Boolean(availability.site.latitude && availability.site.longitude);
   const calendarWeekStart = mondayOfWeek(availability.date);
   const quickDateStart =
     calendarWeekStart < availability.earliestDate
@@ -113,11 +112,6 @@ export default async function PublicSitePage({
             {availability.site.description ? (
               <p className="mt-2 text-sm font-semibold text-[var(--forest)]">{address}</p>
             ) : null}
-            {mapUrl ? (
-              <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-black text-[var(--forest)] hover:border-[var(--forest)]">
-                View location on OpenStreetMap ↗
-              </a>
-            ) : null}
           </div>
 
           <form method="get" className="rounded-3xl border border-[var(--line)] bg-white p-5">
@@ -138,6 +132,8 @@ export default async function PublicSitePage({
             </button>
           </form>
         </div>
+
+        {hasMapLocation ? <SiteLocationMap latitude={availability.site.latitude!} longitude={availability.site.longitude!} siteName={availability.site.name} address={address} tileUrl={process.env.OSM_TILE_URL} /> : null}
 
         <ol className="mt-8 grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black sm:max-w-2xl">
           <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">1 · Choose time</li>
