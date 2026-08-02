@@ -63,7 +63,7 @@ export type CourtAvailability = {
 };
 
 export type SiteAvailability = {
-  merchant: { id: string; name: string; slug: string };
+  merchant: { id: string; name: string; slug: string; gatewayFeeBasisPoints: number };
   site: {
     id: string;
     name: string;
@@ -256,6 +256,7 @@ export async function getSiteAvailability(
       merchantId: merchants.id,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
+      gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
       siteId: sites.id,
       siteName: sites.name,
       siteSlug: sites.slug,
@@ -329,7 +330,7 @@ export async function getSiteAvailability(
 
   if (courtRows.length === 0) {
     return {
-      merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug },
+      merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug, gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints },
       site: {
         id: venue.siteId,
         name: venue.siteName,
@@ -553,7 +554,7 @@ export async function getSiteAvailability(
   });
 
   return {
-    merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug },
+    merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug, gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints },
     site: {
       id: venue.siteId,
       name: venue.siteName,

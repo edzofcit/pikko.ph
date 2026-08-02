@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   index,
@@ -63,6 +64,14 @@ export const platformSettings = pgTable(
     defaultGatewayFeeBasisPoints: integer("default_gateway_fee_basis_points")
       .default(0)
       .notNull(),
+    mayaEnabled: boolean("maya_enabled").default(false).notNull(),
+    mayaEnvironment: varchar("maya_environment", { length: 16 })
+      .default("sandbox")
+      .notNull(),
+    mayaPublicKeyEncrypted: text("maya_public_key_encrypted"),
+    mayaSecretKeyEncrypted: text("maya_secret_key_encrypted"),
+    mayaPublicKeyLastFour: varchar("maya_public_key_last_four", { length: 4 }),
+    mayaSecretKeyLastFour: varchar("maya_secret_key_last_four", { length: 4 }),
     ...timestamps(),
   },
   (table) => [
@@ -73,6 +82,10 @@ export const platformSettings = pgTable(
     check(
       "platform_settings_gateway_fee_range",
       sql`${table.defaultGatewayFeeBasisPoints} between 0 and 10000`,
+    ),
+    check(
+      "platform_settings_maya_environment_valid",
+      sql`${table.mayaEnvironment} in ('sandbox', 'production')`,
     ),
   ],
 );

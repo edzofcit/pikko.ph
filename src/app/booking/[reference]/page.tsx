@@ -2,8 +2,10 @@ import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
+import QRCode from "qrcode";
 import { notFound } from "next/navigation";
 import { ManualPaymentQrSelector } from "@/components/manual-payment-qr-selector";
+import { MayaPaymentPanel } from "@/components/maya-payment-panel";
 import { getDb } from "@/db";
 import {
   bookingAccessTokens,
@@ -169,18 +171,24 @@ export default async function GuestBookingPage({
       )
       .orderBy(asc(manualPaymentProofs.createdAt)),
     db
-      .select({ metadata: payments.metadata })
+      .select({ id: payments.id, provider: payments.provider, status: payments.status, providerPaymentId: payments.providerPaymentId, metadata: payments.metadata })
       .from(payments)
       .where(
         and(
           eq(payments.bookingId, booking.id),
           eq(payments.merchantId, booking.merchantId),
-          eq(payments.provider, "manual"),
         ),
       )
       .limit(1),
   ]);
-  const paymentMetadata = paymentRows[0]?.metadata;
+  const payment = paymentRows[0];
+  const paymentMetadata = payment?.metadata;
+  const isMayaPayment = payment?.provider === "maya";
+  const mayaQrBody = String(paymentMetadata?.mayaQrCodeBody ?? "");
+  const mayaRedirectUrl = String(paymentMetadata?.mayaRedirectUrl ?? "");
+  const mayaQrDataUrl = isMayaPayment && mayaQrBody
+    ? await QRCode.toDataURL(mayaQrBody, { width: 900, margin: 2, errorCorrectionLevel: "M" })
+    : null;
   const selectedProviderValue = String(
     paymentMetadata?.manualPaymentProvider ?? "",
   );
@@ -226,7 +234,7 @@ export default async function GuestBookingPage({
             Booking received
           </p>
           <h1 className="display-type mt-3 text-4xl font-black sm:text-5xl">
-            Complete your manual payment.
+            {isMayaPayment ? "Complete your Maya payment." : "Complete your manual payment."}
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/75">
             Hi {booking.customerName}. Your booking request with {booking.merchantName} has been recorded. Keep this private link so you can return to the details.
@@ -235,7 +243,7 @@ export default async function GuestBookingPage({
 
         <div className="mt-7 grid gap-7 lg:grid-cols-[1fr_21rem]">
           <div className="space-y-7">
-            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            {isMayaPayment ? <section className="rounded-3xl border border-[var(--line)] bg-white p-6"><p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">Secure online payment</p><h2 className="mt-2 text-2xl font-black">Scan to pay with Maya QRPh</h2><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Pikko confirms the booking only after the payment result is verified directly with Maya.</p>{payment && mayaQrDataUrl && mayaRedirectUrl ? <div className="mt-6"><MayaPaymentPanel paymentId={payment.id} accessToken={token} qrDataUrl={mayaQrDataUrl} mayaUrl={mayaRedirectUrl} initiallyPaid={payment.status === "paid"} /></div> : <p className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">The Maya QR details are unavailable. Return to the venue and start a new booking.</p>}</section> : <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-[var(--text-muted)]">
@@ -266,7 +274,7 @@ export default async function GuestBookingPage({
                 <span className="font-black">Total due</span>
                 <span className="text-2xl font-black">{formatPeso(booking.totalCents)}</span>
               </div>
-            </section>
+            </section>}
 
             <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
@@ -402,7 +410,9 @@ export default async function GuestBookingPage({
               </div>
             </dl>
             <p className="mt-5 rounded-2xl bg-[var(--cream)] p-4 text-xs leading-5 text-[var(--text-muted)]">
-              {booking.manualReservationMode === "reserve_immediately"
+              {isMayaPayment
+                ? "The selected slots are temporarily held while the Maya QR is active. The booking confirms automatically after successful payment."
+                : booking.manualReservationMode === "reserve_immediately"
                 ? "The court is reserved until the payment deadline. The merchant will confirm it after verifying payment."
                 : "The court is not guaranteed until the merchant verifies payment."}
             </p>

@@ -4,6 +4,7 @@ import { getSiteAvailability } from "@/lib/booking/availability";
 import { syncCurrentUser } from "@/lib/auth/access";
 import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { formatPeso } from "@/lib/money";
+import { getMayaConfig } from "@/lib/payments/maya";
 import { CheckoutForm } from "./checkout-form";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +17,10 @@ export default async function CheckoutReviewPage({
   searchParams: Promise<{ date?: string; court?: string; starts?: string }>;
 }) {
   const [{ merchantSlug, siteSlug }, query] = await Promise.all([params, searchParams]);
-  const [availability, signedInUser] = await Promise.all([
+  const [availability, signedInUser, mayaConfig] = await Promise.all([
     getSiteAvailability(merchantSlug, siteSlug, query.date),
     syncCurrentUser(),
+    getMayaConfig(),
   ]);
   if (!availability) notFound();
   const customerProfile = signedInUser
@@ -128,7 +130,7 @@ export default async function CheckoutReviewPage({
               Create customer account
             </Link>
           ) : null}
-          {availability.site.manualPaymentEnabled ? (
+          {availability.site.manualPaymentEnabled || (availability.site.onlinePaymentEnabled && mayaConfig) ? (
             <div className="mt-6">
               <CheckoutForm
                 merchantSlug={availability.merchant.slug}
@@ -138,6 +140,8 @@ export default async function CheckoutReviewPage({
                 starts={selectedSlots.map((slot) => slot.startsAt)}
                 deadlineMinutes={availability.site.manualPaymentDeadlineMinutes}
                 reserveImmediately={availability.site.manualReservationMode === "reserve_immediately"}
+                mayaEnabled={availability.site.onlinePaymentEnabled && Boolean(mayaConfig)}
+                manualEnabled={availability.site.manualPaymentEnabled}
                 customer={
                   signedInUser
                     ? {
@@ -155,9 +159,9 @@ export default async function CheckoutReviewPage({
             </div>
           ) : (
             <div className="mt-6 rounded-2xl bg-white/10 p-5">
-              <p className="font-black">Online checkout is not available yet.</p>
+              <p className="font-black">Payment is not available.</p>
               <p className="mt-2 text-sm leading-6 text-white/75">
-                This venue has not enabled manual payment. Maya QR Ph checkout is the next payment integration.
+                This venue has not enabled an available payment method. Contact the venue or return to availability.
               </p>
               <Link href={backHref} className="mt-5 inline-flex w-full justify-center rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]">
                 Return to availability

@@ -71,6 +71,13 @@
       "when": 1785680831046,
       "tag": "20260802142711_regenerate_pickle_first_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785687188965,
+      "tag": "20260802161308_misty_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

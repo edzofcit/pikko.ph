@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
-  createManualBooking,
+  createBooking,
   type ManualBookingState,
 } from "./actions";
 
@@ -16,6 +16,8 @@ export function CheckoutForm({
   starts,
   deadlineMinutes,
   reserveImmediately,
+  mayaEnabled,
+  manualEnabled,
   customer,
 }: {
   merchantSlug: string;
@@ -25,6 +27,8 @@ export function CheckoutForm({
   starts: string[];
   deadlineMinutes: number;
   reserveImmediately: boolean;
+  mayaEnabled: boolean;
+  manualEnabled: boolean;
   customer: {
     signedIn: boolean;
     fullName: string;
@@ -32,8 +36,9 @@ export function CheckoutForm({
     mobileNumber: string;
   } | null;
 }) {
+  const [paymentMethod, setPaymentMethod] = useState(mayaEnabled ? "maya" : "manual");
   const [state, formAction, pending] = useActionState(
-    createManualBooking,
+    createBooking,
     initialState,
   );
 
@@ -44,6 +49,14 @@ export function CheckoutForm({
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="courtId" value={courtId} />
       <input type="hidden" name="starts" value={starts.join(",")} />
+
+      <fieldset>
+        <legend className="text-sm font-black">Payment method</legend>
+        <div className="mt-3 grid gap-3">
+          {mayaEnabled ? <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${paymentMethod === "maya" ? "border-[var(--lime)] bg-white/15" : "border-white/20 bg-white/5"}`}><input name="paymentMethod" type="radio" value="maya" checked={paymentMethod === "maya"} onChange={() => setPaymentMethod("maya")} className="mt-1" /><span><strong className="block text-white">Maya QR online payment</strong><span className="mt-1 block text-xs leading-5 text-white/65">Scan a dynamic QRPh code. Your booking confirms automatically after payment.</span></span></label> : null}
+          {manualEnabled ? <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${paymentMethod === "manual" ? "border-[var(--lime)] bg-white/15" : "border-white/20 bg-white/5"}`}><input name="paymentMethod" type="radio" value="manual" checked={paymentMethod === "manual"} onChange={() => setPaymentMethod("manual")} className="mt-1" /><span><strong className="block text-white">Manual payment</strong><span className="mt-1 block text-xs leading-5 text-white/65">Follow the venue&apos;s payment instructions and upload a screenshot.</span></span></label> : null}
+        </div>
+      </fieldset>
 
       <label className="block text-sm font-bold">
         Full name
@@ -102,11 +115,13 @@ export function CheckoutForm({
 
       <div className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/80">
         <div className="flex items-center justify-between gap-3">
-          <p className="font-black text-white">Manual payment</p>
+          <p className="font-black text-white">{paymentMethod === "maya" ? "Maya QR payment" : "Manual payment"}</p>
           <span className="rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-black uppercase text-[var(--ink)]">Selected</span>
         </div>
         <p className="mt-1">
-          {reserveImmediately
+          {paymentMethod === "maya"
+            ? "Your selected slots will be held while the one-time Maya QR is active. Confirmation is automatic after successful payment."
+            : reserveImmediately
             ? `Your court will be reserved for ${deadlineMinutes} minutes while you send payment.`
             : "Your request will not reserve the court until the merchant verifies payment."}
         </p>
@@ -136,7 +151,7 @@ export function CheckoutForm({
         disabled={pending}
         className="w-full rounded-full bg-[var(--lime)] px-5 py-3.5 text-sm font-black text-[var(--ink)] disabled:opacity-60"
       >
-        {pending ? "Preparing payment…" : "Continue to payment"}
+        {pending ? "Preparing payment…" : paymentMethod === "maya" ? "Generate Maya QR" : "Continue to manual payment"}
       </button>
     </form>
   );

@@ -20,6 +20,8 @@ import { requirePlatformAdmin } from "@/lib/auth/access";
 import { processSubscriptionBilling } from "@/lib/billing/subscriptions";
 import { pikkoEmailSender } from "@/lib/email/sender";
 import { normalizeManualPaymentOptions } from "@/lib/manual-payment/options";
+import { getMayaConfig, registerMayaWebhook, testMayaConnection } from "@/lib/payments/maya";
+import { encryptPlatformSecret } from "@/lib/security/encrypted-secret";
 import { toPublicMerchantSlug } from "@/lib/slug";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -77,7 +79,7 @@ function escapeHtml(value: string) {
 }
 
 function appUrl() {
-  return (process.env.APP_URL?.trim() || "https://pikko-ph.vercel.app").replace(/\/$/, "");
+  return (process.env.APP_URL?.trim() || "https://pikko.ph").replace(/\/$/, "");
 }
 
 function pesoToCents(value: FormDataEntryValue | null) {
@@ -368,26 +370,84 @@ export async function updatePlatformSettings(formData: FormData) {
   const admin = await requirePlatformAdmin();
   const defaultMonthlyCourtPriceCents = pesoToCents(formData.get("defaultMonthlyCourtPrice"));
   const defaultGatewayFeeBasisPoints = percentToBasisPoints(formData.get("defaultGatewayFeePercentage"));
-  if (defaultMonthlyCourtPriceCents === null || defaultGatewayFeeBasisPoints === null) {
+  const mayaEnvironment = String(formData.get("mayaEnvironment") ?? "sandbox");
+  const mayaPublicKey = String(formData.get("mayaPublicKey") ?? "").trim();
+  const mayaSecretKey = String(formData.get("mayaSecretKey") ?? "").trim();
+  if (
+    defaultMonthlyCourtPriceCents === null ||
+    defaultGatewayFeeBasisPoints === null ||
+    !new Set(["sandbox", "production"]).has(mayaEnvironment) ||
+    (mayaPublicKey && (!mayaPublicKey.startsWith("pk-") || mayaPublicKey.length > 500)) ||
+    (mayaSecretKey && (!mayaSecretKey.startsWith("sk-") || mayaSecretKey.length > 500))
+  ) {
     redirect(settingsAdminUrl("error", "Check the default subscription and gateway fee values."));
   }
   const db = getDb();
   await db.insert(platformSettings).values({ key: "default" }).onConflictDoNothing();
   const [before] = await db.select().from(platformSettings).where(eq(platformSettings.key, "default")).limit(1);
-  const after = { defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints };
+  if (!before) redirect(settingsAdminUrl("error", "Platform settings could not be loaded."));
+  const mayaPublicKeyEncrypted = mayaPublicKey
+    ? encryptPlatformSecret(mayaPublicKey)
+    : before.mayaPublicKeyEncrypted;
+  const mayaSecretKeyEncrypted = mayaSecretKey
+    ? encryptPlatformSecret(mayaSecretKey)
+    : before.mayaSecretKeyEncrypted;
+  const mayaEnabled =
+    formData.get("mayaEnabled") === "on" &&
+    Boolean(mayaPublicKeyEncrypted && mayaSecretKeyEncrypted);
+  const after = {
+    defaultMonthlyCourtPriceCents,
+    defaultGatewayFeeBasisPoints,
+    mayaEnabled,
+    mayaEnvironment,
+    mayaPublicKeyEncrypted,
+    mayaSecretKeyEncrypted,
+    mayaPublicKeyLastFour: mayaPublicKey ? mayaPublicKey.slice(-4) : before.mayaPublicKeyLastFour,
+    mayaSecretKeyLastFour: mayaSecretKey ? mayaSecretKey.slice(-4) : before.mayaSecretKeyLastFour,
+  };
   await db.batch([
     db.update(platformSettings).set({ ...after, updatedAt: new Date() }).where(eq(platformSettings.key, "default")),
     db.insert(auditEvents).values({
       actorUserId: admin.id,
       action: "platform.settings.updated",
       targetType: "platform_settings",
-      before: before ? { defaultMonthlyCourtPriceCents: before.defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints: before.defaultGatewayFeeBasisPoints } : null,
-      after,
+      before: { defaultMonthlyCourtPriceCents: before.defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints: before.defaultGatewayFeeBasisPoints, mayaEnabled: before.mayaEnabled, mayaEnvironment: before.mayaEnvironment, mayaPublicKeyLastFour: before.mayaPublicKeyLastFour, mayaSecretKeyLastFour: before.mayaSecretKeyLastFour },
+      after: { defaultMonthlyCourtPriceCents, defaultGatewayFeeBasisPoints, mayaEnabled, mayaEnvironment, mayaPublicKeyLastFour: after.mayaPublicKeyLastFour, mayaSecretKeyLastFour: after.mayaSecretKeyLastFour },
     }),
   ]);
   revalidatePath("/admin/settings");
   revalidatePath("/admin/merchants");
-  redirect(settingsAdminUrl("success", "Platform defaults updated."));
+  redirect(settingsAdminUrl("success", mayaEnabled ? "Platform defaults and Maya gateway updated." : "Platform defaults updated. Maya remains disabled."));
+}
+
+export async function verifyMayaGateway() {
+  await requirePlatformAdmin();
+  const config = await getMayaConfig({ requireEnabled: false });
+  if (!config) redirect(settingsAdminUrl("error", "Save both Maya API keys before testing the connection."));
+  try {
+    await testMayaConnection(config);
+  } catch (error) {
+    console.error("Maya gateway verification failed", error);
+    redirect(settingsAdminUrl("error", "Maya rejected the configured credentials. Check the environment and API keys."));
+  }
+  redirect(settingsAdminUrl("success", `Maya ${config.environment} credentials are valid.`));
+}
+
+export async function configureMayaWebhooks() {
+  await requirePlatformAdmin();
+  const config = await getMayaConfig({ requireEnabled: false });
+  if (!config) redirect(settingsAdminUrl("error", "Save both Maya API keys before registering webhooks."));
+  const callbackUrl = `${appUrl()}/api/payments/maya/webhook`;
+  try {
+    await Promise.all([
+      registerMayaWebhook(config, "PAYMENT_SUCCESS", callbackUrl),
+      registerMayaWebhook(config, "PAYMENT_FAILED", callbackUrl),
+    ]);
+  } catch (error) {
+    console.error("Maya webhook registration failed", error);
+    redirect(settingsAdminUrl("error", "Maya could not register the webhooks. They may already exist; verify them in Maya Manager."));
+  }
+  redirect(settingsAdminUrl("success", `Maya payment webhooks now point to ${callbackUrl}.`));
 }
 
 export async function updateMerchantProfile(formData: FormData) {

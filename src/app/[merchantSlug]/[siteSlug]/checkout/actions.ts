@@ -1,7 +1,7 @@
 "use server";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -17,6 +17,8 @@ import { getSiteAvailability } from "@/lib/booking/availability";
 import { syncCurrentUser } from "@/lib/auth/access";
 import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { createMayaDynamicQr, getMayaConfig } from "@/lib/payments/maya";
+import { encryptPlatformSecret } from "@/lib/security/encrypted-secret";
 
 export type ManualBookingState = { error: string | null };
 
@@ -74,7 +76,7 @@ function isCourtConflict(error: unknown) {
   );
 }
 
-export async function createManualBooking(
+export async function createBooking(
   _previousState: ManualBookingState,
   formData: FormData,
 ): Promise<ManualBookingState> {
@@ -91,6 +93,7 @@ export async function createManualBooking(
   const submittedEmail = readText(formData, "email").toLowerCase();
   const mobileNumber = readText(formData, "mobileNumber");
   const customerNotes = readText(formData, "customerNotes");
+  const paymentMethod = readText(formData, "paymentMethod") === "maya" ? "maya" : "manual";
   const signedInUser = await syncCurrentUser();
   const fullName = submittedFullName || signedInUser?.fullName || "";
   const email = signedInUser?.email ?? submittedEmail;
@@ -113,8 +116,16 @@ export async function createManualBooking(
   }
 
   const availability = await getSiteAvailability(merchantSlug, siteSlug, date);
-  if (!availability || !availability.site.manualPaymentEnabled) {
-    return { error: "Manual payment is not available for this venue." };
+  if (
+    !availability ||
+    (paymentMethod === "manual" && !availability.site.manualPaymentEnabled) ||
+    (paymentMethod === "maya" && !availability.site.onlinePaymentEnabled)
+  ) {
+    return { error: "The selected payment option is not available for this venue." };
+  }
+  const mayaConfig = paymentMethod === "maya" ? await getMayaConfig() : null;
+  if (paymentMethod === "maya" && !mayaConfig) {
+    return { error: "Maya online payment is temporarily unavailable. Choose manual payment or contact the venue." };
   }
 
   const court = availability.courts.find((item) => item.id === courtId);
@@ -156,9 +167,7 @@ export async function createManualBooking(
     }
   }
   const now = new Date();
-  const paymentDueAt = new Date(
-    now.getTime() + availability.site.manualPaymentDeadlineMinutes * 60_000,
-  );
+  const paymentDueAt = new Date(now.getTime() + (paymentMethod === "maya" ? 60 : availability.site.manualPaymentDeadlineMinutes) * 60_000);
   const bookingId = randomUUID();
   const reference = bookingReference();
   const accessToken = randomBytes(32).toString("base64url");
@@ -183,8 +192,11 @@ export async function createManualBooking(
       timezone: availability.site.timezone,
     },
   }));
-  const reserveImmediately =
-    availability.site.manualReservationMode === "reserve_immediately";
+  const reserveImmediately = paymentMethod === "maya" || availability.site.manualReservationMode === "reserve_immediately";
+  const platformFeeCents = paymentMethod === "maya"
+    ? Math.round(subtotalCents * availability.merchant.gatewayFeeBasisPoints / 10_000)
+    : 0;
+  const mayaReturnToken = paymentMethod === "maya" ? randomBytes(24).toString("base64url") : null;
   const lastBookedEnd = itemRows[itemRows.length - 1]!.endsAt;
   const accessExpiresAt = new Date(
     Math.max(
@@ -237,14 +249,20 @@ export async function createManualBooking(
       id: paymentId,
       merchantId: availability.merchant.id,
       bookingId,
-      provider: "manual",
-      method: "manual_bank_transfer",
+      provider: paymentMethod === "maya" ? "maya" : "manual",
+      method: paymentMethod === "maya" ? "maya_qrph" : "manual_bank_transfer",
       status: "pending",
       amountCents: subtotalCents,
-      requestReference: `MANUAL-${reference}`,
+      requestReference: `${paymentMethod === "maya" ? "MAYA" : "MANUAL"}-${reference}`,
+      gatewayFeeBasisPoints: paymentMethod === "maya" ? availability.merchant.gatewayFeeBasisPoints : 0,
+      platformFeeCents,
       expiresAt: paymentDueAt,
       metadata: {
         source: signedInUser ? "customer_checkout" : "guest_checkout",
+        ...(mayaReturnToken ? {
+          returnTokenHash: tokenHash(mayaReturnToken),
+          bookingAccessTokenEncrypted: encryptPlatformSecret(accessToken),
+        } : {}),
       },
     });
   const insertAccessToken = db.insert(bookingAccessTokens).values({
@@ -289,13 +307,53 @@ export async function createManualBooking(
     if (isCourtConflict(error)) {
       return { error: "Another customer just reserved one of these times. Please choose an available slot." };
     }
-    console.error("Manual booking creation failed", error);
+    console.error("Booking creation failed", error);
     return { error: "We could not create the booking. Please try again." };
   }
 
   const requestHeaders = await headers();
   const bookingPath = `/booking/${reference}?token=${encodeURIComponent(accessToken)}`;
   const bookingUrl = new URL(bookingPath, bookingOrigin(requestHeaders)).toString();
+  if (paymentMethod === "maya" && mayaConfig && mayaReturnToken) {
+    const origin = bookingOrigin(requestHeaders);
+    const returnBase = new URL("/payments/maya/return", origin);
+    returnBase.searchParams.set("payment", paymentId);
+    returnBase.searchParams.set("returnToken", mayaReturnToken);
+    try {
+      const maya = await createMayaDynamicQr({
+        config: mayaConfig,
+        amountCents: subtotalCents,
+        requestReference: `MAYA-${reference}`,
+        redirectUrls: {
+          success: `${returnBase.toString()}&result=success`,
+          failure: `${returnBase.toString()}&result=failure`,
+          cancel: `${returnBase.toString()}&result=cancel`,
+        },
+        metadata: { bookingReference: reference, merchantId: availability.merchant.id },
+      });
+      await db.update(payments).set({
+        providerPaymentId: maya.paymentId,
+        providerStatus: "CREATED",
+        metadata: {
+          source: signedInUser ? "customer_checkout" : "guest_checkout",
+          returnTokenHash: tokenHash(mayaReturnToken),
+          bookingAccessTokenEncrypted: encryptPlatformSecret(accessToken),
+          mayaRedirectUrl: maya.redirectUrl,
+          mayaQrCodeBody: maya.qrCodeBody,
+          mayaEnvironment: mayaConfig.environment,
+        },
+        updatedAt: new Date(),
+      }).where(eq(payments.id, paymentId));
+    } catch (error) {
+      console.error("Maya QR creation failed", error);
+      await db.batch([
+        db.update(payments).set({ status: "failed", failedAt: new Date(), failureMessage: "Maya could not create the QR payment.", updatedAt: new Date() }).where(eq(payments.id, paymentId)),
+        db.update(bookings).set({ status: "cancelled", paymentStatus: "failed", cancelledAt: new Date(), cancellationReason: "Maya checkout could not be started.", updatedAt: new Date() }).where(eq(bookings.id, bookingId)),
+        db.update(courtAllocations).set({ active: false, releasedAt: new Date() }).where(and(eq(courtAllocations.merchantId, availability.merchant.id), eq(courtAllocations.active, true), inArray(courtAllocations.bookingItemId, itemRows.map((item) => item.id)))),
+      ]);
+      return { error: "Maya could not prepare the QR payment. Your court hold was released; please try again." };
+    }
+  }
   if (process.env.BOOKING_EMAIL_ENABLED === "true") {
     after(async () => {
       try {
@@ -315,7 +373,7 @@ export async function createManualBooking(
           })),
           totalCents: subtotalCents,
           paymentDueAt,
-          manualPaymentInstructions: availability.site.manualPaymentInstructions,
+          manualPaymentInstructions: paymentMethod === "manual" ? availability.site.manualPaymentInstructions : null,
         });
       } catch (error) {
         console.error(`Booking confirmation email failed for ${reference}`, error);
