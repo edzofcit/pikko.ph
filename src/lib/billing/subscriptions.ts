@@ -56,18 +56,13 @@ export async function processSubscriptionBilling(options?: {
     .update(subscriptionInvoices)
     .set({ status: "past_due", updatedAt: now })
     .where(and(eq(subscriptionInvoices.status, "issued"), lt(subscriptionInvoices.dueAt, now)));
-  const merchantRows = await db
+  const merchantBaseRows = await db
     .select({
       id: merchants.id,
       displayName: merchants.displayName,
       subscriptionStatus: merchants.subscriptionStatus,
       trialEndsAt: merchants.trialEndsAt,
       monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
-      activeCourtCount: sql<number>`(
-        select count(*)::int from ${courts}
-        where ${courts.merchantId} = ${merchants.id}
-          and ${courts.status} = 'active'
-      )`.mapWith(Number),
     })
     .from(merchants)
     .where(
@@ -75,6 +70,29 @@ export async function processSubscriptionBilling(options?: {
         ? eq(merchants.id, options.merchantId)
         : inArray(merchants.subscriptionStatus, ["trialing", "active"]),
     );
+
+  const activeCourtCountRows = merchantBaseRows.length
+    ? await db
+        .select({
+          merchantId: courts.merchantId,
+          count: sql<number>`count(*)::int`.mapWith(Number),
+        })
+        .from(courts)
+        .where(
+          and(
+            inArray(courts.merchantId, merchantBaseRows.map((merchant) => merchant.id)),
+            eq(courts.status, "active"),
+          ),
+        )
+        .groupBy(courts.merchantId)
+    : [];
+  const activeCourtCounts = new Map(
+    activeCourtCountRows.map((row) => [row.merchantId, row.count]),
+  );
+  const merchantRows = merchantBaseRows.map((merchant) => ({
+    ...merchant,
+    activeCourtCount: activeCourtCounts.get(merchant.id) ?? 0,
+  }));
 
   if (!merchantRows.length) {
     return { merchantsProcessed: 0, invoicesCreated: 0, trialsConverted: 0 };

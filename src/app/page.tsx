@@ -87,27 +87,21 @@ export default async function Home({
         <nav className="flex items-center gap-2 sm:gap-3" aria-label="Primary navigation">
           <Link
             href="/auth/sign-in?audience=customer&callbackURL=%2Fcustomer"
-            className="hidden rounded-full px-3 py-2.5 text-sm font-semibold text-[var(--forest)] transition hover:bg-white/70 md:inline-flex"
+            className="rounded-full px-3 py-2.5 text-sm font-semibold text-[var(--forest)] transition hover:bg-white/70"
           >
-            Customer login
+            Login
           </Link>
           <Link
             href="/auth/sign-up?audience=customer&callbackURL=%2Fcustomer"
-            className="hidden rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white lg:inline-flex"
+            className="hidden rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white sm:inline-flex"
           >
-            Customer signup
+            Sign up
           </Link>
           <Link
             href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant"
             className="rounded-full border border-[var(--line)] bg-white/60 px-3 py-2.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white"
           >
-            Merchant login
-          </Link>
-          <Link
-            href="#courts"
-            className="rounded-full bg-[var(--ink)] px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_0_#8fa71f] transition hover:-translate-y-0.5 hover:shadow-[0_6px_0_#8fa71f]"
-          >
-            Find a court
+            Partner Dashboard
           </Link>
         </nav>
       </header>
@@ -143,7 +137,7 @@ export default async function Home({
               href="/auth/sign-up?audience=customer&callbackURL=%2Fcustomer"
               className="rounded-full border border-[var(--forest)] px-6 py-3.5 text-sm font-bold text-[var(--forest)] transition hover:bg-white/70"
             >
-              Create customer account
+              Sign up
             </Link>
             <span className="text-sm font-medium text-[var(--muted)]">
               Guest checkout available

@@ -34,7 +34,7 @@ export default async function AdminMerchantsPage({
 }) {
   const [admin, query] = await Promise.all([requirePlatformAdmin(), searchParams]);
   const db = getDb();
-  const [merchantRows, defaultRows] = await Promise.all([db
+  const [merchantBaseRows, defaultRows, siteCountRows, courtCountRows, bookingCountRows] = await Promise.all([db
     .select({
       id: merchants.id,
       displayName: merchants.displayName,
@@ -46,12 +46,23 @@ export default async function AdminMerchantsPage({
       trialEndsAt: merchants.trialEndsAt,
       monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
       gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
-      siteCount: sql<number>`(select count(*)::int from ${sites} where ${sites.merchantId} = ${merchants.id})`.mapWith(Number),
-      courtCount: sql<number>`(select count(*)::int from ${courts} where ${courts.merchantId} = ${merchants.id})`.mapWith(Number),
-      bookingCount: sql<number>`(select count(*)::int from ${bookings} where ${bookings.merchantId} = ${merchants.id})`.mapWith(Number),
     })
     .from(merchants)
-    .orderBy(desc(merchants.createdAt)), db.select().from(platformSettings).limit(1)]);
+    .orderBy(desc(merchants.createdAt)),
+    db.select().from(platformSettings).limit(1),
+    db.select({ merchantId: sites.merchantId, count: sql<number>`count(*)::int`.mapWith(Number) }).from(sites).groupBy(sites.merchantId),
+    db.select({ merchantId: courts.merchantId, count: sql<number>`count(*)::int`.mapWith(Number) }).from(courts).groupBy(courts.merchantId),
+    db.select({ merchantId: bookings.merchantId, count: sql<number>`count(*)::int`.mapWith(Number) }).from(bookings).groupBy(bookings.merchantId),
+  ]);
+  const siteCounts = new Map(siteCountRows.map((row) => [row.merchantId, row.count]));
+  const courtCounts = new Map(courtCountRows.map((row) => [row.merchantId, row.count]));
+  const bookingCounts = new Map(bookingCountRows.map((row) => [row.merchantId, row.count]));
+  const merchantRows = merchantBaseRows.map((merchant) => ({
+    ...merchant,
+    siteCount: siteCounts.get(merchant.id) ?? 0,
+    courtCount: courtCounts.get(merchant.id) ?? 0,
+    bookingCount: bookingCounts.get(merchant.id) ?? 0,
+  }));
   const defaults = defaultRows[0];
 
   return (

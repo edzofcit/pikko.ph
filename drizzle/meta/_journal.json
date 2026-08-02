@@ -64,6 +64,13 @@
       "when": 1785679221444,
       "tag": "20260802140021_narrow_krista_starr",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785680831046,
+      "tag": "20260802142711_regenerate_pickle_first_invoice",
+      "breakpoints": true
     }
   ]
 }
