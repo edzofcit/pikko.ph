@@ -85,6 +85,13 @@
       "when": 1785744131474,
       "tag": "20260803080211_uneven_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785754367065,
+      "tag": "20260803105247_tense_king_cobra",
+      "breakpoints": true
     }
   ]
 }

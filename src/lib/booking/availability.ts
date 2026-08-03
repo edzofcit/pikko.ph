@@ -264,6 +264,7 @@ export async function getSiteAvailability(
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
       merchantContactEmail: merchants.contactEmail,
+      onlinePaymentsAllowed: merchants.onlinePaymentsAllowed,
       gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
       siteId: sites.id,
       siteName: sites.name,
@@ -361,7 +362,8 @@ export async function getSiteAvailability(
         amenities: venue.amenities,
         bookingLeadMinutes: venue.bookingLeadMinutes,
         advanceBookingDays: venue.advanceBookingDays,
-        onlinePaymentEnabled: venue.onlinePaymentEnabled,
+        onlinePaymentEnabled:
+          venue.onlinePaymentsAllowed && venue.onlinePaymentEnabled,
         manualPaymentEnabled: venue.manualPaymentEnabled,
         manualReservationMode: venue.manualReservationMode,
         manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
@@ -592,7 +594,8 @@ export async function getSiteAvailability(
       amenities: venue.amenities,
       bookingLeadMinutes: venue.bookingLeadMinutes,
       advanceBookingDays: venue.advanceBookingDays,
-      onlinePaymentEnabled: venue.onlinePaymentEnabled,
+      onlinePaymentEnabled:
+        venue.onlinePaymentsAllowed && venue.onlinePaymentEnabled,
       manualPaymentEnabled: venue.manualPaymentEnabled,
       manualReservationMode: venue.manualReservationMode,
       manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,

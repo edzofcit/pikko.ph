@@ -46,6 +46,7 @@ export default async function AdminMerchantsPage({
       trialEndsAt: merchants.trialEndsAt,
       monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
       gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
+      onlinePaymentsAllowed: merchants.onlinePaymentsAllowed,
     })
     .from(merchants)
     .orderBy(desc(merchants.createdAt)),
@@ -152,13 +153,14 @@ export default async function AdminMerchantsPage({
               <div className="rounded-xl bg-[var(--paper)] p-3"><p className="text-xs text-[var(--text-muted)]">Bookings</p><p className="mt-1 font-black">{merchant.bookingCount}</p></div>
             </div>
 
-            <form action={updateMerchantCommercialSettings} className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
+            <form action={updateMerchantCommercialSettings} className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 xl:grid-cols-6 xl:items-end">
               <input type="hidden" name="merchantId" value={merchant.id} />
               <input type="hidden" name="returnTo" value="/admin/merchants" />
               <label className="text-xs font-bold">Merchant status<select name="status" defaultValue={merchant.status} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal"><option value="onboarding">Onboarding</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select></label>
               <label className="text-xs font-bold">Subscription<select name="subscriptionStatus" defaultValue={merchant.subscriptionStatus} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal"><option value="trialing">Trialing</option><option value="active">Paid / active</option><option value="past_due">Past due</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
               <label className="text-xs font-bold">Per court / month (PHP)<input name="monthlyCourtPrice" type="number" min="0" max="1000000" step="0.01" defaultValue={(merchant.monthlyCourtPriceCents / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" /></label>
               <label className="text-xs font-bold">Gateway fee (%)<input name="gatewayFeePercentage" type="number" min="0" max="100" step="0.01" defaultValue={(merchant.gatewayFeeBasisPoints / 100).toFixed(2)} className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal" /></label>
+              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-bold"><input name="onlinePaymentsAllowed" type="checkbox" defaultChecked={merchant.onlinePaymentsAllowed} /> Allow online payments</label>
               <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">Save settings</button>
             </form>
           </article>

@@ -56,7 +56,7 @@ export const sites = pgTable(
     policies: jsonb("policies").$type<JsonObject>().default({}).notNull(),
     bookingLeadMinutes: integer("booking_lead_minutes").default(60).notNull(),
     advanceBookingDays: integer("advance_booking_days").default(30).notNull(),
-    onlinePaymentEnabled: boolean("online_payment_enabled").default(true).notNull(),
+    onlinePaymentEnabled: boolean("online_payment_enabled").default(false).notNull(),
     manualPaymentEnabled: boolean("manual_payment_enabled").default(false).notNull(),
     manualReservationMode: manualReservationModeEnum("manual_reservation_mode")
       .default("reserve_immediately")

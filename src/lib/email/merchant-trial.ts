@@ -108,7 +108,7 @@ export async function sendMerchantTrialStartedEmails(trial: MerchantTrialEmail) 
       content: `<div style="margin-top:16px;padding:26px;border:1px solid #dfe3db;border-radius:22px;background:#fff;box-shadow:0 10px 30px rgba(21,61,49,.06);">
         <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:#eaf7ee;color:#21613f;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;">Trial active</div>
         <h2 style="margin:20px 0 8px;font-size:22px;">Set up your booking experience</h2>
-        <p style="margin:0;color:#617068;line-height:1.65;">Add your first site and courts, publish operating hours and rates, then configure manual or Maya QR payments.</p>
+        <p style="margin:0;color:#617068;line-height:1.65;">Add your first site and courts, publish operating hours and rates, then configure your manual payment instructions and QR options.</p>
         <div style="margin-top:20px;padding:16px;border-radius:16px;background:#f5f2e8;"><div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#78847e;">Free trial ends</div><div style="margin-top:6px;font-size:20px;font-weight:900;">${escapeHtml(trialEnd)}</div></div>
         ${button("Open Partner Dashboard", dashboardUrl)}
         <p style="margin:14px 3px 0;font-size:12px;line-height:1.55;color:#78847e;">Subscription billing begins after the trial and is based on the active-court rate configured for your merchant account.</p>

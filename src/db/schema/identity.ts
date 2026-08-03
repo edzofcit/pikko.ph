@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -51,6 +52,9 @@ export const merchants = pgTable(
       .notNull(),
     gatewayFeeBasisPoints: integer("gateway_fee_basis_points")
       .default(0)
+      .notNull(),
+    onlinePaymentsAllowed: boolean("online_payments_allowed")
+      .default(false)
       .notNull(),
     ...timestamps(),
   },

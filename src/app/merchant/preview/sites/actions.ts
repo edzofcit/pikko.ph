@@ -233,7 +233,19 @@ export async function updateSiteBookingSettings(formData: FormData) {
   const manualPaymentDeadlineMinutes = Number(formData.get("manualPaymentDeadlineMinutes"));
   const manualReservationMode = String(formData.get("manualReservationMode") ?? "reserve_immediately");
   const manualPaymentInstructions = String(formData.get("manualPaymentInstructions") ?? "").trim();
-  const onlinePaymentEnabled = formData.get("onlinePaymentEnabled") === "on";
+  const requestedOnlinePayment = formData.get("onlinePaymentEnabled") === "on";
+  if (requestedOnlinePayment && !access.membership.onlinePaymentsAllowed) {
+    redirect(
+      previewUrl(
+        siteId,
+        "settings",
+        "Contact Pikko.ph admin to enable online payment.",
+        true,
+      ),
+    );
+  }
+  const onlinePaymentEnabled =
+    access.membership.onlinePaymentsAllowed && requestedOnlinePayment;
   const manualPaymentEnabled = formData.get("manualPaymentEnabled") === "on";
   const valid = Number.isInteger(bookingLeadMinutes) && bookingLeadMinutes >= 0 && bookingLeadMinutes <= 10080 && Number.isInteger(advanceBookingDays) && advanceBookingDays >= 1 && advanceBookingDays <= 730 && Number.isInteger(manualPaymentDeadlineMinutes) && manualPaymentDeadlineMinutes >= 5 && manualPaymentDeadlineMinutes <= 1440 && new Set(["reserve_immediately", "reserve_after_verification"]).has(manualReservationMode) && manualPaymentInstructions.length <= 5000 && (!manualPaymentEnabled || manualPaymentInstructions.length >= 4);
   if (!valid) redirect(previewUrl(siteId, "settings", "Check the booking and payment settings.", true));

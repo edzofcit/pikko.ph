@@ -109,6 +109,7 @@ export async function updateMerchantCommercialSettings(formData: FormData) {
   const gatewayFeeBasisPoints = percentToBasisPoints(
     formData.get("gatewayFeePercentage"),
   );
+  const onlinePaymentsAllowed = formData.get("onlinePaymentsAllowed") === "on";
 
   if (
     !UUID_PATTERN.test(merchantId) ||
@@ -129,6 +130,7 @@ export async function updateMerchantCommercialSettings(formData: FormData) {
       subscriptionStatus: merchants.subscriptionStatus,
       monthlyCourtPriceCents: merchants.monthlyCourtPriceCents,
       gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
+      onlinePaymentsAllowed: merchants.onlinePaymentsAllowed,
     })
     .from(merchants)
     .where(eq(merchants.id, merchantId))
@@ -144,6 +146,7 @@ export async function updateMerchantCommercialSettings(formData: FormData) {
       subscriptionStatus as (typeof merchants.$inferInsert)["subscriptionStatus"],
     monthlyCourtPriceCents,
     gatewayFeeBasisPoints,
+    onlinePaymentsAllowed,
   };
   const now = new Date();
 
@@ -163,10 +166,20 @@ export async function updateMerchantCommercialSettings(formData: FormData) {
         subscriptionStatus: merchant.subscriptionStatus,
         monthlyCourtPriceCents: merchant.monthlyCourtPriceCents,
         gatewayFeeBasisPoints: merchant.gatewayFeeBasisPoints,
+        onlinePaymentsAllowed: merchant.onlinePaymentsAllowed,
       },
       after: nextSettings,
       metadata: { merchantName: merchant.displayName },
     }),
+    db
+      .update(sites)
+      .set({
+        onlinePaymentEnabled: onlinePaymentsAllowed
+          ? sql`${sites.onlinePaymentEnabled}`
+          : false,
+        updatedAt: now,
+      })
+      .where(eq(sites.merchantId, merchantId)),
   ]);
 
   if (nextSettings.subscriptionStatus === "active") {

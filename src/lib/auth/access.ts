@@ -116,6 +116,7 @@ export async function getMerchantAccess() {
       role: merchantMemberships.role,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
+      onlinePaymentsAllowed: merchants.onlinePaymentsAllowed,
     })
     .from(merchantMemberships)
     .innerJoin(merchants, eq(merchantMemberships.merchantId, merchants.id))
