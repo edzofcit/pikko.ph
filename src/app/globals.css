@@ -132,3 +132,192 @@ textarea:focus-visible {
 .pikko-public-map .leaflet-tooltip-top::before {
   border-top-color: var(--forest);
 }
+
+.landing-preview {
+  background:
+    linear-gradient(rgb(23 60 42 / 4%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(23 60 42 / 4%) 1px, transparent 1px),
+    var(--cream);
+  background-size: 72px 72px;
+}
+
+.pikko-scene-shell {
+  perspective: 1200px;
+  isolation: isolate;
+}
+
+.pikko-scene {
+  --scene-x: 0deg;
+  --scene-y: 0deg;
+  transform: rotateY(var(--scene-x)) rotateX(var(--scene-y)) scale(1.025);
+  transform-style: preserve-3d;
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.pikko-scene-glow {
+  position: absolute;
+  top: 30%;
+  left: 53%;
+  width: 58%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: rgb(245 255 61 / 16%);
+  filter: blur(58px);
+  transform: translate3d(-50%, -50%, -80px);
+}
+
+.pikko-scene-court {
+  position: absolute;
+  right: -12%;
+  bottom: -12%;
+  width: 92%;
+  height: 70%;
+  overflow: hidden;
+  border: 4px solid rgb(245 255 61 / 78%);
+  border-radius: 20px;
+  background:
+    linear-gradient(90deg, transparent 49.6%, rgb(255 255 255 / 72%) 49.6% 50.4%, transparent 50.4%),
+    linear-gradient(rgb(255 255 255 / 9%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 9%) 1px, transparent 1px),
+    #2d6b4a;
+  background-size: auto, 32px 32px, 32px 32px, auto;
+  box-shadow: 0 55px 95px rgb(0 0 0 / 38%);
+  transform: rotateX(63deg) rotateZ(-10deg) translate3d(8%, 18%, -30px);
+  transform-origin: center bottom;
+}
+
+.pikko-scene-line {
+  position: absolute;
+  display: block;
+  background: rgb(255 255 255 / 78%);
+}
+
+.pikko-scene-line-center {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 3px;
+}
+
+.pikko-scene-line-left,
+.pikko-scene-line-right {
+  top: 0;
+  width: 3px;
+  height: 50%;
+}
+
+.pikko-scene-line-left {
+  left: 25%;
+}
+
+.pikko-scene-line-right {
+  right: 25%;
+}
+
+.pikko-scene-net {
+  position: absolute;
+  top: 48.5%;
+  left: -2%;
+  width: 104%;
+  height: 8%;
+  border-block: 2px solid rgb(255 255 255 / 85%);
+  background-image:
+    linear-gradient(45deg, transparent 44%, rgb(255 255 255 / 35%) 45% 55%, transparent 56%),
+    linear-gradient(-45deg, transparent 44%, rgb(255 255 255 / 35%) 45% 55%, transparent 56%);
+  background-size: 13px 13px;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 24%);
+}
+
+.pikko-scene-ball {
+  position: absolute;
+  right: 19%;
+  top: 28%;
+  z-index: 12;
+  width: 3.75rem;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 33% 31%, #f9ff8e 0 6%, transparent 7%),
+    radial-gradient(circle at 68% 40%, #c4cf00 0 6%, transparent 7%),
+    radial-gradient(circle at 48% 70%, #d7e000 0 7%, transparent 8%),
+    radial-gradient(circle at 35% 28%, #ffffc0, var(--lime) 42%, #c6d000 100%);
+  box-shadow: 0 20px 30px rgb(0 0 0 / 38%), 0 0 32px rgb(245 255 61 / 24%);
+  transform: translateZ(110px);
+  animation: pikko-ball-float 4.4s ease-in-out infinite;
+}
+
+.pikko-scene-paddle {
+  position: absolute;
+  right: 3%;
+  top: 10%;
+  z-index: 9;
+  width: 7.5rem;
+  height: 9.5rem;
+  border: 4px solid rgb(255 255 255 / 72%);
+  border-radius: 48% 48% 38% 38%;
+  background:
+    radial-gradient(circle at 30% 30%, rgb(245 255 61 / 38%), transparent 25%),
+    #173c2a;
+  box-shadow: 0 30px 48px rgb(0 0 0 / 32%);
+  transform: rotate(18deg) translateZ(30px);
+}
+
+.pikko-scene-paddle span {
+  position: absolute;
+  bottom: -4.2rem;
+  left: calc(50% - 1rem);
+  width: 2rem;
+  height: 4.5rem;
+  border-radius: 0 0 1rem 1rem;
+  background: #ff7657;
+  box-shadow: 0 16px 25px rgb(0 0 0 / 28%);
+}
+
+.pikko-scene-card {
+  transform: translateZ(100px) rotateY(1deg);
+}
+
+.pikko-scene-status {
+  transform: translateZ(150px) rotateY(-2deg);
+}
+
+@keyframes pikko-ball-float {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -4deg;
+  }
+  50% {
+    translate: 0 -16px;
+    rotate: 4deg;
+  }
+}
+
+@media (max-width: 639px) {
+  .pikko-scene-court {
+    right: -32%;
+    width: 125%;
+  }
+
+  .pikko-scene-ball {
+    right: 14%;
+    top: 42%;
+    width: 3rem;
+  }
+
+  .pikko-scene-paddle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pikko-scene {
+    transform: none;
+    transition: none;
+  }
+
+  .pikko-scene-ball {
+    animation: none;
+  }
+}
