@@ -1,152 +1,244 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
+import { HeroCourtScene } from "@/components/landing-preview/hero-court-scene";
 import { MerchantSiteDirectory } from "@/components/merchant-site-directory";
 import { getDb } from "@/db";
-import { courts, merchants, sitePhotos, sites } from "@/db/schema";
+import { merchants } from "@/db/schema";
+import { getAuth } from "@/lib/auth/server";
+import { getMerchantLandingMarketplace } from "@/lib/marketplace/landing";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ merchantSlug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ merchantSlug: string }>;
+}): Promise<Metadata> {
   const { merchantSlug } = await params;
-  const [merchant] = await getDb().select({ name: merchants.displayName, description: merchants.description }).from(merchants).where(and(eq(merchants.slug, merchantSlug), eq(merchants.status, "active"))).limit(1);
-  return merchant ? { title: `${merchant.name} pickleball courts`, description: merchant.description || `Book a pickleball court at ${merchant.name}.` } : { title: "Pickleball venues" };
-}
-
-export default async function PublicMerchantPage({ params }: { params: Promise<{ merchantSlug: string }> }) {
-  const { merchantSlug } = await params;
-  const db = getDb();
-  const [merchant] = await db
-    .select({
-      id: merchants.id,
-      name: merchants.displayName,
-      slug: merchants.slug,
-      description: merchants.description,
-      logoUrl: merchants.logoUrl,
-      logoPathname: merchants.logoPathname,
-      coverUrl: merchants.coverUrl,
-      coverPathname: merchants.coverPathname,
-    })
+  const [merchant] = await getDb()
+    .select({ name: merchants.displayName, description: merchants.description })
     .from(merchants)
     .where(and(eq(merchants.slug, merchantSlug), eq(merchants.status, "active")))
     .limit(1);
-  if (!merchant) notFound();
-
-  const venueSites = await db
-    .select({
-      id: sites.id,
-      name: sites.name,
-      slug: sites.slug,
-      description: sites.description,
-      city: sites.city,
-      province: sites.province,
-      amenities: sites.amenities,
-      latitude: sites.latitude,
-      longitude: sites.longitude,
-      courtId: courts.id,
-      hourlyRateCents: courts.baseHourlyRateCents,
-      indoor: courts.indoor,
-      coverUrl: sql<string | null>`case when ${sitePhotos.id} is null then null else '/api/venue-photos/site/' || ${sitePhotos.id}::text end`,
-    })
-    .from(sites)
-    .leftJoin(courts, and(eq(courts.siteId, sites.id), eq(courts.status, "active")))
-    .leftJoin(sitePhotos, and(eq(sitePhotos.siteId, sites.id), eq(sitePhotos.isCover, true)))
-    .where(and(eq(sites.merchantId, merchant.id), eq(sites.status, "active")))
-    .orderBy(asc(sites.name));
-
-  const siteCards = Array.from(
-    venueSites.reduce((map, row) => {
-      const existing = map.get(row.id);
-      if (existing) {
-        if (row.courtId) {
-          existing.courtCount += 1;
-          existing.indoorCourtCount += row.indoor ? 1 : 0;
-          existing.outdoorCourtCount += row.indoor ? 0 : 1;
-          if (
-            row.hourlyRateCents !== null &&
-            (existing.startingRateCents === null ||
-              row.hourlyRateCents < existing.startingRateCents)
-          ) {
-            existing.startingRateCents = row.hourlyRateCents;
-          }
-        }
-      } else {
-        map.set(row.id, {
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          description: row.description,
-          city: row.city,
-          province: row.province,
-          amenities: row.amenities,
-          latitude: row.latitude ? Number(row.latitude) : null,
-          longitude: row.longitude ? Number(row.longitude) : null,
-          courtCount: row.courtId ? 1 : 0,
-          startingRateCents: row.hourlyRateCents,
-          indoorCourtCount: row.courtId && row.indoor ? 1 : 0,
-          outdoorCourtCount: row.courtId && !row.indoor ? 1 : 0,
-          coverUrl: row.coverUrl,
-        });
+  return merchant
+    ? {
+        title: `${merchant.name} pickleball courts`,
+        description:
+          merchant.description || `Book a pickleball court at ${merchant.name}.`,
       }
-      return map;
-    }, new Map<string, { id: string; name: string; slug: string; description: string | null; city: string; province: string | null; amenities: string[]; latitude: number | null; longitude: number | null; courtCount: number; startingRateCents: number | null; indoorCourtCount: number; outdoorCourtCount: number; coverUrl: string | null }>()).values(),
-  );
+    : { title: "Pickleball venues" };
+}
 
+export default async function PublicMerchantPage({
+  params,
+}: {
+  params: Promise<{ merchantSlug: string }>;
+}) {
+  const { merchantSlug } = await params;
+  const db = getDb();
+  const [[merchant], siteCards, { data: session }] = await Promise.all([
+    db
+      .select({
+        id: merchants.id,
+        name: merchants.displayName,
+        slug: merchants.slug,
+        description: merchants.description,
+        logoUrl: merchants.logoUrl,
+        logoPathname: merchants.logoPathname,
+        coverUrl: merchants.coverUrl,
+        coverPathname: merchants.coverPathname,
+      })
+      .from(merchants)
+      .where(and(eq(merchants.slug, merchantSlug), eq(merchants.status, "active")))
+      .limit(1),
+    getMerchantLandingMarketplace(merchantSlug),
+    getAuth().getSession(),
+  ]);
+
+  if (!merchant) notFound();
   if (siteCards.length === 1) redirect(`/${merchant.slug}/${siteCards[0].slug}`);
-  const courtCount = siteCards.reduce((total, site) => total + site.courtCount, 0);
+
+  const courtCount = siteCards.reduce(
+    (total, site) => total + site.courts.length,
+    0,
+  );
+  const openSlotCount = siteCards.reduce(
+    (total, site) => total + site.availableSlotCount,
+    0,
+  );
   const logoUrl = merchant.logoPathname ? merchant.logoUrl : null;
-  const coverUrl = merchant.coverPathname ? merchant.coverUrl : null;
+  const merchantCoverUrl = merchant.coverPathname ? merchant.coverUrl : null;
+  const featuredSite = siteCards[0];
 
   return (
-    <main className="min-h-screen bg-[#f7f5ed] text-[var(--ink)]">
-      <a href="#locations" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:font-black focus:text-[var(--forest)]">Skip to locations</a>
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
+    <main className="landing-preview min-h-screen overflow-hidden text-[var(--ink)]">
+      <a
+        href="#locations"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:font-black focus:text-[var(--forest)]"
+      >
+        Skip to locations
+      </a>
+
+      <header className="sticky top-0 z-50 border-b border-[var(--forest)]/10 bg-[var(--cream)]/82 backdrop-blur-2xl">
+        <div className="mx-auto flex min-h-[4.75rem] w-full max-w-[90rem] items-center justify-between px-5 sm:px-8 lg:px-12">
           <Brand />
-          <nav aria-label="Merchant page navigation" className="flex items-center gap-2">
-            <Link href="/" className="hidden min-h-11 items-center rounded-full px-4 text-sm font-bold text-[var(--forest)] transition-colors duration-200 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--forest)] sm:inline-flex">All venues</Link>
-            <Link href="/auth/sign-in?audience=customer&callbackURL=%2Fcustomer" className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] bg-white px-4 text-sm font-black text-[var(--forest)] transition-colors duration-200 hover:border-[var(--forest)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--forest)]">Login</Link>
+          <nav aria-label="Merchant page navigation" className="flex items-center gap-2 sm:gap-3">
+            <Link href="/" className="hidden rounded-full px-4 py-2 text-sm font-black text-[var(--forest)] hover:bg-white md:inline-flex">
+              All venues
+            </Link>
+            {session?.user ? (
+              <Link href="/customer" className="inline-flex min-h-11 items-center rounded-full bg-[var(--forest)] px-5 text-sm font-black text-white shadow-[0_3px_0_#0d281a] transition hover:-translate-y-0.5 motion-reduce:transform-none">
+                My Profile
+              </Link>
+            ) : (
+              <Link href="/auth/sign-in?audience=customer&callbackURL=%2Fcustomer" className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-black text-[var(--forest)] hover:bg-white">
+                Login
+              </Link>
+            )}
           </nav>
         </div>
       </header>
 
-      <section className="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
-        <div className="relative mx-auto min-h-[38rem] max-w-7xl overflow-hidden rounded-[2rem] bg-[var(--forest)] shadow-[0_28px_80px_rgb(23_60_42_/_20%)] sm:rounded-[2.5rem]">
-          {coverUrl ? <Image src={coverUrl} alt={`${merchant.name} pickleball courts`} fill sizes="100vw" className="object-cover" priority /> : <div className="noise absolute inset-0 bg-[linear-gradient(135deg,#173c2a,#345f42)]" />}
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(8_31_22_/_96%)_0%,rgb(8_31_22_/_82%)_44%,rgb(8_31_22_/_22%)_100%)]" />
-          <div className="relative z-10 flex min-h-[38rem] max-w-3xl flex-col justify-end px-6 py-8 text-white sm:px-10 sm:py-12 lg:px-16 lg:py-16">
-            {logoUrl ? <div className="relative mb-6 h-20 w-20 overflow-hidden rounded-2xl border border-white/30 bg-white shadow-lg sm:h-24 sm:w-24"><Image src={logoUrl} alt={`${merchant.name} logo`} fill sizes="96px" className="object-contain p-1.5" priority /></div> : null}
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--lime)]">Official booking page</p>
-            <h1 className="display-type mt-4 max-w-2xl text-5xl font-black leading-[0.94] tracking-[-0.045em] sm:text-7xl lg:text-8xl">Play at {merchant.name}.</h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-white/80 sm:text-lg">{merchant.description || "Choose a location, see live court availability, and book your next game in a few taps."}</p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href="#locations" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--lime)] px-6 text-sm font-black text-[var(--ink)] shadow-[0_5px_0_rgb(8_31_22_/_70%)] transition duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white motion-reduce:transform-none">Choose a location</a>
-              <span className="inline-flex min-h-12 items-center rounded-full border border-white/20 bg-white/10 px-5 text-sm font-bold text-white/90 backdrop-blur">Live schedules · Secure booking</span>
+      <section className="relative px-4 pb-14 pt-4 sm:px-6 sm:pb-20 sm:pt-6 lg:px-8">
+        <div className="pointer-events-none absolute left-[-12rem] top-24 size-[32rem] rounded-full bg-[var(--lime)]/25 blur-[100px]" />
+        <div className="relative mx-auto max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--forest)] shadow-[0_35px_110px_rgb(23_60_42_/_24%)] sm:rounded-[3rem]">
+          {merchantCoverUrl ? (
+            <Image
+              src={merchantCoverUrl}
+              alt=""
+              fill
+              sizes="100vw"
+              className="object-cover opacity-10 blur-[2px]"
+              priority
+            />
+          ) : null}
+          <div className="noise absolute inset-0 opacity-20" />
+          <div className="relative grid min-h-[43rem] lg:min-h-[46rem] lg:grid-cols-[0.92fr_1.08fr]">
+            <div className="relative z-10 flex flex-col justify-center px-6 py-12 text-white sm:px-10 sm:py-16 lg:px-16 lg:py-20 xl:px-20">
+              <div className="flex items-center gap-4">
+                {logoUrl ? (
+                  <div className="relative size-16 overflow-hidden rounded-2xl border border-white/25 bg-white shadow-xl sm:size-20">
+                    <Image
+                      src={logoUrl}
+                      alt={`${merchant.name} logo`}
+                      fill
+                      sizes="80px"
+                      className="object-contain p-1.5"
+                      priority
+                    />
+                  </div>
+                ) : (
+                  <div className="grid size-16 place-items-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-black text-[var(--lime)] sm:size-20">
+                    {merchant.name.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--lime)]">Official booking page</p>
+                  <p className="mt-1 text-sm font-bold text-white/55">Powered by Pikko.ph</p>
+                </div>
+              </div>
+              <h1 className="display-type mt-7 max-w-3xl text-[clamp(3.5rem,6.5vw,6.75rem)] font-black tracking-[-0.065em]">
+                Play at<br />{merchant.name}.
+              </h1>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/72 sm:text-lg">
+                {merchant.description ||
+                  "Choose a location, see live court availability, and book your next game in a few taps."}
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <a href="#locations" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--lime)] px-6 text-sm font-black text-[var(--ink)] shadow-[0_4px_0_#c3cb00] transition hover:-translate-y-0.5 motion-reduce:transform-none">
+                  Choose a location
+                </a>
+                <span className="inline-flex min-h-12 items-center rounded-full border border-white/15 bg-white/8 px-5 text-sm font-bold text-white/75 backdrop-blur">
+                  Live schedules · Secure booking
+                </span>
+              </div>
+              <div className="mt-8 grid max-w-xl grid-cols-3 gap-3 border-t border-white/15 pt-6">
+                <Metric value={siteCards.length} label="Locations" />
+                <Metric value={courtCount} label="Courts" />
+                <Metric value={openSlotCount} label="Open slots" live />
+              </div>
             </div>
-            <dl className="mt-9 grid max-w-xl grid-cols-3 overflow-hidden rounded-2xl border border-white/15 bg-black/20 backdrop-blur-md">
-              <div className="p-4 sm:p-5"><dt className="text-[0.68rem] font-bold uppercase tracking-wider text-white/55">Locations</dt><dd className="mt-1 text-2xl font-black tabular-nums sm:text-3xl">{siteCards.length}</dd></div>
-              <div className="border-x border-white/15 p-4 sm:p-5"><dt className="text-[0.68rem] font-bold uppercase tracking-wider text-white/55">Courts</dt><dd className="mt-1 text-2xl font-black tabular-nums sm:text-3xl">{courtCount}</dd></div>
-              <div className="p-4 sm:p-5"><dt className="text-[0.68rem] font-bold uppercase tracking-wider text-white/55">Booking</dt><dd className="mt-2 text-xs font-black text-[var(--lime)] sm:text-sm">Real time</dd></div>
-            </dl>
+
+            <div className="relative m-4 min-h-[30rem] sm:m-6 lg:ml-0 lg:min-h-0 lg:py-6 lg:pr-6">
+              {featuredSite ? (
+                <HeroCourtScene
+                  venueName={featuredSite.name}
+                  venueHref={`/${featuredSite.merchantSlug}/${featuredSite.slug}`}
+                  location={`${featuredSite.city}${featuredSite.province ? `, ${featuredSite.province}` : ""}`}
+                  coverUrl={merchantCoverUrl ?? featuredSite.coverUrl}
+                  courts={featuredSite.courts}
+                  nextAvailableLabel={featuredSite.nextAvailableLabel}
+                  availableSlotCount={featuredSite.availableSlotCount}
+                  sceneVariant="rally"
+                />
+              ) : (
+                <div className="relative h-full min-h-[30rem] overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/5">
+                  {merchantCoverUrl ? (
+                    <Image src={merchantCoverUrl} alt={`${merchant.name} pickleball courts`} fill sizes="(max-width: 1024px) 100vw, 55vw" className="object-cover" priority />
+                  ) : (
+                    <div className="noise absolute inset-0 bg-[linear-gradient(135deg,#315f43,#173c2a)]" />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="locations" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 sm:px-8 sm:py-20">
-        <MerchantSiteDirectory merchantSlug={merchant.slug} sites={siteCards} />
+      <section id="locations" className="scroll-mt-24 border-y border-[var(--line)] bg-[var(--paper)] py-16 sm:py-24">
+        <div className="mx-auto w-full max-w-[90rem] px-5 sm:px-8 lg:px-12">
+          <MerchantSiteDirectory merchantSlug={merchant.slug} sites={siteCards} />
 
-        {siteCards.length === 0 ? <div className="rounded-3xl border border-dashed border-[var(--line)] bg-white/70 px-6 py-14 text-center"><p className="font-bold">No public sites are available yet.</p><p className="mt-2 text-sm text-[var(--text-muted)]">Check back after the merchant finishes venue setup.</p></div> : null}
+          {siteCards.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-[var(--line)] bg-white/70 px-6 py-14 text-center">
+              <p className="font-bold">No public sites are available yet.</p>
+              <p className="mt-2 text-sm text-[var(--text-muted)]">Check back after the merchant finishes venue setup.</p>
+            </div>
+          ) : null}
 
-        <div className="mt-14 grid gap-3 rounded-[2rem] border border-[var(--line)] bg-[#eff5d8] p-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[["clock", "Live availability", "Court schedules update in real time."], ["calendar", "Easy booking", "Choose one hour or consecutive blocks."], ["shield", "Secure payments", "Online or verified manual options."], ["players", "For every player", "Guests and registered players welcome."]].map(([icon, title, copy]) => <article key={title} className="rounded-2xl bg-white/70 p-5"><FeatureIcon name={icon} /><h2 className="mt-4 text-sm font-black">{title}</h2><p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{copy}</p></article>)}
+          <div className="mt-16 grid gap-3 rounded-[2rem] border border-[var(--line)] bg-[#eff5d8] p-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["clock", "Live availability", "Court schedules update in real time."],
+              ["calendar", "Easy booking", "Choose one hour or consecutive blocks."],
+              ["shield", "Secure payments", "Online or verified manual options."],
+              ["players", "For every player", "Guests and registered players welcome."],
+            ].map(([icon, title, copy]) => (
+              <article key={title} className="rounded-2xl bg-white/70 p-5">
+                <FeatureIcon name={icon} />
+                <h2 className="mt-4 text-sm font-black">{title}</h2>
+                <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{copy}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <footer className="border-t border-[var(--line)] bg-[var(--paper)]"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-7 text-xs text-[var(--text-muted)] sm:px-8"><p>Powered by Pikko.ph</p><Link href="/" className="font-black text-[var(--forest)]">Discover more courts →</Link></div></footer>
+      <footer className="bg-[var(--cream)]">
+        <div className="mx-auto flex max-w-[90rem] flex-wrap items-center justify-between gap-4 px-5 py-8 text-xs text-[var(--text-muted)] sm:px-8 lg:px-12">
+          <Brand compact />
+          <div className="flex items-center gap-5">
+            <p>Official booking page for {merchant.name}</p>
+            <Link href="/" className="font-black text-[var(--forest)]">Discover more courts →</Link>
+          </div>
+        </div>
+      </footer>
     </main>
+  );
+}
+
+function Metric({ value, label, live = false }: { value: number; label: string; live?: boolean }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <strong className="text-2xl font-black sm:text-3xl">{value}</strong>
+        {live ? <span className="size-2 rounded-full bg-[var(--lime)] shadow-[0_0_12px_var(--lime)]" /> : null}
+      </div>
+      <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/55">{label}</span>
+    </div>
   );
 }
 

@@ -25,7 +25,9 @@ export type MarketplaceSite = {
   startingRateCents: number;
 };
 
-export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
+export async function getMarketplaceSites(
+  merchantSlug?: string,
+): Promise<MarketplaceSite[]> {
   const db = getDb();
   const rows = await db
     .select({
@@ -63,6 +65,7 @@ export async function getMarketplaceSites(): Promise<MarketplaceSite[]> {
         eq(merchants.status, "active"),
         eq(sites.status, "active"),
         eq(courts.status, "active"),
+        merchantSlug ? eq(merchants.slug, merchantSlug) : undefined,
       ),
     )
     .orderBy(

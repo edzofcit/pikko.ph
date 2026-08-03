@@ -14,13 +14,20 @@ type SiteCard = {
   city: string;
   province: string | null;
   amenities: string[];
-  latitude: number | null;
-  longitude: number | null;
-  courtCount: number;
-  startingRateCents: number | null;
-  indoorCourtCount: number;
-  outdoorCourtCount: number;
   coverUrl: string | null;
+  availableSlotCount: number;
+  nextAvailableLabel: string | null;
+  liveStartingRateCents: number;
+  courts: Array<{
+    id: string;
+    name: string;
+    indoor: boolean;
+    previewSlots: Array<{
+      startsAt: string;
+      label: string;
+      state: "available" | "booked" | "held" | "blocked" | "closed" | "past" | "unavailable";
+    }>;
+  }>;
 };
 
 type DirectoryIconName = "arrow" | "court" | "location" | "search";
@@ -72,24 +79,16 @@ export function MerchantSiteDirectory({ merchantSlug, sites }: { merchantSlug: s
 
       <p className="mt-8 text-sm font-bold text-[var(--text-muted)]" aria-live="polite">{filteredSites.length} {filteredSites.length === 1 ? "location" : "locations"} available</p>
 
-      <div className="mt-4 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className={`mt-4 grid gap-6 md:grid-cols-2 ${filteredSites.length <= 2 ? "mx-auto max-w-6xl" : "xl:grid-cols-3"}`}>
         {filteredSites.map((site) => {
-          const courtType = site.indoorCourtCount && site.outdoorCourtCount
-            ? "Indoor & outdoor"
-            : site.indoorCourtCount
-              ? "Indoor courts"
-              : site.outdoorCourtCount
-                ? "Outdoor courts"
-                : null;
-
           return (
-            <Link key={site.id} href={`/${merchantSlug}/${site.slug}`} className="group flex overflow-hidden rounded-[1.75rem] border border-[var(--line)] bg-white shadow-[0_18px_55px_rgb(23_60_42_/_8%)] transition duration-200 hover:-translate-y-1 hover:border-[var(--forest)] hover:shadow-[0_22px_65px_rgb(23_60_42_/_14%)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--forest)] motion-reduce:transform-none">
+            <Link key={site.id} href={`/${merchantSlug}/${site.slug}`} className="group flex min-h-[38rem] overflow-hidden rounded-[2rem] border border-[var(--line)] bg-white shadow-[0_20px_65px_rgb(23_34_26_/_8%)] transition duration-300 hover:-translate-y-1.5 hover:border-[var(--forest)] hover:shadow-[0_28px_80px_rgb(23_60_42_/_14%)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--forest)] motion-reduce:transform-none">
               <article className="flex min-w-0 flex-1 flex-col">
                 <div className="relative aspect-[16/10] overflow-hidden bg-[var(--forest)]">
                   {site.coverUrl ? <Image src={site.coverUrl} alt={`${site.name} pickleball venue`} fill sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" className="object-cover transition duration-500 group-hover:scale-[1.03] motion-reduce:transform-none" /> : <div className="noise absolute inset-0 bg-[linear-gradient(135deg,#173c2a,#345f42)]" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
-                  {courtType ? <span className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">{courtType}</span> : null}
-                  <span className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3 py-1.5 text-xs font-black text-[var(--ink)]"><DirectoryIcon name="court" />{site.courtCount} {site.courtCount === 1 ? "court" : "courts"}</span>
+                  <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white backdrop-blur-md"><span className={`size-2 rounded-full ${site.availableSlotCount > 0 ? "bg-[var(--lime)] shadow-[0_0_12px_var(--lime)]" : "bg-white/45"}`} />{site.availableSlotCount > 0 ? "Live availability" : "No open slots"}</span>
+                  <span className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3 py-1.5 text-xs font-black text-[var(--ink)]"><DirectoryIcon name="court" />{site.courts.length} {site.courts.length === 1 ? "court" : "courts"}</span>
                 </div>
 
                 <div className="flex flex-1 flex-col p-5 sm:p-6">
@@ -99,8 +98,22 @@ export function MerchantSiteDirectory({ merchantSlug, sites }: { merchantSlug: s
 
                   {site.amenities.length ? <div className="mt-4 flex flex-wrap gap-2">{site.amenities.slice(0, 3).map((amenity) => <span key={amenity} className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-[0.7rem] font-bold text-[var(--forest)]">{amenity}</span>)}{site.amenities.length > 3 ? <span className="rounded-full bg-[var(--cream)] px-2.5 py-1 text-[0.7rem] font-bold text-[var(--text-muted)]">+{site.amenities.length - 3}</span> : null}</div> : null}
 
+                  <div className="mt-5 rounded-2xl border border-[var(--line)] bg-[var(--cream)]/65 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3"><p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Next hourly slots</p><span className="text-[0.65rem] font-black text-[var(--forest)]">{site.availableSlotCount} open</span></div>
+                    <div className="space-y-2">
+                      {site.courts.slice(0, 2).map((court) => (
+                        <div key={court.id} className="grid grid-cols-[5rem_1fr] items-center gap-2">
+                          <span className="truncate text-[0.68rem] font-black text-[var(--forest)]">{court.name}</span>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {court.previewSlots.length > 0 ? court.previewSlots.map((slot) => <SlotCell key={slot.startsAt} slot={slot} />) : <span className="col-span-4 rounded-lg bg-white px-2 py-2 text-center text-[0.62rem] font-bold text-[var(--text-muted)]">No future hours</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="mt-auto flex items-end justify-between gap-4 border-t border-[var(--line)] pt-5" style={{ marginTop: site.description || site.amenities.length ? "1.25rem" : "2rem" }}>
-                    <div>{site.startingRateCents !== null ? <><p className="text-[0.68rem] font-bold uppercase tracking-wider text-[var(--text-muted)]">Starts at</p><p className="mt-0.5 font-black text-[var(--forest)]">{formatPeso(site.startingRateCents)}<span className="text-xs font-bold text-[var(--text-muted)]"> / hour</span></p></> : <p className="text-sm font-bold text-[var(--text-muted)]">See venue rates</p>}</div>
+                    <div><p className="text-[0.68rem] font-bold uppercase tracking-wider text-[var(--text-muted)]">{site.nextAvailableLabel ? `Next open · ${site.nextAvailableLabel}` : "Current rate"}</p><p className="mt-0.5 font-black text-[var(--forest)]">{formatPeso(site.liveStartingRateCents)}<span className="text-xs font-bold text-[var(--text-muted)]"> / hour</span></p></div>
                     <span className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-[var(--forest)] px-4 text-xs font-black text-white transition-colors group-hover:bg-[var(--ink)]">View slots <DirectoryIcon name="arrow" /></span>
                   </div>
                 </div>
@@ -113,6 +126,17 @@ export function MerchantSiteDirectory({ merchantSlug, sites }: { merchantSlug: s
       {!filteredSites.length ? <div className="mt-6 rounded-3xl border border-dashed border-[var(--line)] bg-white p-8 text-center"><p className="font-black">No locations match “{query}”.</p><p className="mt-2 text-sm text-[var(--text-muted)]">Try another city, venue name, or amenity.</p><button type="button" onClick={() => setQuery("")} className="mt-5 min-h-11 rounded-full bg-[var(--forest)] px-5 text-sm font-black text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--forest)]">Clear search</button></div> : null}
     </div>
   );
+}
+
+function SlotCell({ slot }: { slot: SiteCard["courts"][number]["previewSlots"][number] }) {
+  const style = slot.state === "available"
+    ? "bg-[var(--lime)] text-[var(--ink)]"
+    : slot.state === "booked" || slot.state === "held"
+      ? "bg-[#d8ddd7] text-[var(--text-muted)]"
+      : slot.state === "blocked"
+        ? "bg-[#ffd9d0] text-[#7b2f21]"
+        : "bg-white text-[var(--text-muted)]/55";
+  return <span title={`${slot.label}: ${slot.state}`} className={`truncate rounded-lg px-1 py-2 text-center text-[0.58rem] font-black ${style}`}>{slot.label.replace(":00", "")}</span>;
 }
 
 function DirectoryIcon({ name }: { name: DirectoryIconName }) {

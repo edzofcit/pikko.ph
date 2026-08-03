@@ -106,10 +106,11 @@ function enrichSite(
   };
 }
 
-export async function getLandingMarketplace(
+async function getEnrichedMarketplace(
   requestedDate?: string,
+  merchantSlug?: string,
 ): Promise<LandingMarketplaceSite[]> {
-  const sites = await getMarketplaceSites();
+  const sites = await getMarketplaceSites(merchantSlug);
   const availability = await Promise.all(
     sites.map((site) =>
       getSiteAvailability(site.merchantSlug, site.slug, requestedDate),
@@ -117,4 +118,17 @@ export async function getLandingMarketplace(
   );
 
   return sites.map((site, index) => enrichSite(site, availability[index]));
+}
+
+export async function getLandingMarketplace(
+  requestedDate?: string,
+): Promise<LandingMarketplaceSite[]> {
+  return getEnrichedMarketplace(requestedDate);
+}
+
+export async function getMerchantLandingMarketplace(
+  merchantSlug: string,
+  requestedDate?: string,
+): Promise<LandingMarketplaceSite[]> {
+  return getEnrichedMarketplace(requestedDate, merchantSlug);
 }

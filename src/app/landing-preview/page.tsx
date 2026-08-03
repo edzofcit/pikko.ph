@@ -132,8 +132,8 @@ export default async function LandingPreviewPage({
         <div className="pointer-events-none absolute left-[-12rem] top-24 size-[32rem] rounded-full bg-[var(--lime)]/25 blur-[100px]" />
         <div className="relative mx-auto max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--forest)] shadow-[0_35px_110px_rgb(23_60_42_/_24%)] sm:rounded-[3rem]">
           <div className="noise absolute inset-0 opacity-20" />
-          <div className="relative grid min-h-[43rem] lg:grid-cols-[0.92fr_1.08fr]">
-            <div className="relative z-10 flex flex-col justify-center px-6 pb-8 pt-12 text-white sm:px-10 sm:py-16 lg:px-16 lg:py-20 xl:px-20">
+          <div className="relative grid min-h-[43rem] lg:min-h-[46rem] lg:grid-cols-[0.92fr_1.08fr]">
+            <div className="relative z-10 flex flex-col justify-center px-6 pb-12 pt-12 text-white sm:px-10 sm:py-16 lg:px-16 lg:pb-24 lg:pt-20 xl:px-20">
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[0.68rem] font-black uppercase tracking-[0.17em] text-white/80 backdrop-blur">
                 <span className="size-2 rounded-full bg-[var(--lime)] shadow-[0_0_14px_var(--lime)]" />
                 Live schedules · {activeDateLabel}
@@ -159,11 +159,13 @@ export default async function LandingPreviewPage({
               {featuredSite ? (
                 <HeroCourtScene
                   venueName={featuredSite.name}
+                  venueHref={`/${featuredSite.merchantSlug}/${featuredSite.slug}`}
                   location={`${featuredSite.city}${featuredSite.province ? `, ${featuredSite.province}` : ""}`}
                   coverUrl={featuredSite.coverUrl}
                   courts={featuredSite.courts}
                   nextAvailableLabel={featuredSite.nextAvailableLabel}
                   availableSlotCount={featuredSite.availableSlotCount}
+                  sceneVariant="equipment"
                 />
               ) : (
                 <div className="grid h-full min-h-[30rem] place-items-center rounded-[1.75rem] border border-white/15 bg-white/5 px-8 text-center text-white/70">
@@ -173,7 +175,7 @@ export default async function LandingPreviewPage({
             </div>
           </div>
 
-          <form action="/landing-preview#courts" className="relative z-30 m-4 mt-0 grid gap-3 rounded-[1.5rem] border border-white/25 bg-white/95 p-4 shadow-[0_22px_70px_rgb(0_0_0_/_24%)] backdrop-blur-2xl sm:m-6 sm:mt-0 sm:p-5 lg:-mt-8 lg:grid-cols-[1.25fr_0.75fr_0.8fr_auto] lg:items-end">
+          <form action="/#courts" className="relative z-30 m-4 mt-0 grid gap-3 rounded-[1.5rem] border border-white/25 bg-white/95 p-4 shadow-[0_22px_70px_rgb(0_0_0_/_24%)] backdrop-blur-2xl sm:m-6 sm:mt-0 sm:p-5 lg:-mt-4 lg:grid-cols-[1.25fr_0.75fr_0.8fr_auto] lg:items-end">
             <label className="text-xs font-black text-[var(--forest)]">
               Where do you want to play?
               <span className="relative mt-2 block">
@@ -216,7 +218,7 @@ export default async function LandingPreviewPage({
             </div>
           </div>
 
-          <form action="/landing-preview#courts" className="mt-9 grid gap-3 rounded-[1.75rem] border border-[var(--line)] bg-white p-4 shadow-[0_16px_45px_rgb(23_34_26_/_6%)] md:grid-cols-[1.25fr_0.8fr_0.7fr_0.8fr_auto] md:items-end">
+          <form action="/#courts" className="mt-9 grid gap-3 rounded-[1.75rem] border border-[var(--line)] bg-white p-4 shadow-[0_16px_45px_rgb(23_34_26_/_6%)] md:grid-cols-[1.25fr_0.8fr_0.7fr_0.8fr_auto] md:items-end">
             <FilterInput label="Search courts" name="q" defaultValue={query.q ?? ""} placeholder="Venue, city, surface…" />
             <label className="text-xs font-black text-[var(--forest)]">City<select name="city" defaultValue={cityFilter} className="mt-2 min-h-12 w-full rounded-xl border border-[var(--line)] bg-white px-4 text-base font-normal"><option value="">All cities</option>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</select></label>
             <label className="text-xs font-black text-[var(--forest)]">Court type<select name="courtType" defaultValue={courtType} className="mt-2 min-h-12 w-full rounded-xl border border-[var(--line)] bg-white px-4 text-base font-normal"><option value="any">Any</option><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select></label>
@@ -226,11 +228,11 @@ export default async function LandingPreviewPage({
 
           <div className="my-6 flex items-center justify-between gap-4 text-sm">
             <p className="font-black text-[var(--forest)]" aria-live="polite">{filteredSites.length} {filteredSites.length === 1 ? "venue" : "venues"} found</p>
-            {hasFilters ? <Link href="/landing-preview#courts" className="text-xs font-black underline underline-offset-4">Clear filters</Link> : null}
+            {hasFilters ? <Link href="/#courts" className="text-xs font-black underline underline-offset-4">Clear filters</Link> : null}
           </div>
 
           {filteredSites.length > 0 ? (
-            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <div className={`grid gap-6 lg:grid-cols-2 ${filteredSites.length <= 2 ? "mx-auto max-w-6xl" : "xl:grid-cols-3"}`}>
               {filteredSites.map((site, index) => (
                 <VenueAvailabilityCard key={site.id} site={site} priority={index < 2} date={activeDate} />
               ))}
@@ -286,15 +288,15 @@ function VenueAvailabilityCard({ site, priority, date }: { site: LandingSite; pr
 
   return (
     <article className="group flex min-h-[38rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--line)] bg-white shadow-[0_20px_65px_rgb(23_34_26_/_8%)] transition duration-300 hover:-translate-y-1.5 hover:border-[var(--forest)] hover:shadow-[0_28px_80px_rgb(23_60_42_/_14%)] motion-reduce:transform-none">
-      <div className="relative aspect-[16/9] overflow-hidden bg-[var(--forest)]">
+      <Link href={href} aria-label={`View booking availability for ${site.name}`} className="relative block aspect-[16/9] overflow-hidden bg-[var(--forest)] focus-visible:z-10">
         {site.coverUrl ? <Image src={site.coverUrl} alt={`${site.name} pickleball venue`} fill sizes="(max-width: 1024px) 100vw, (max-width: 1440px) 50vw, 33vw" className="object-cover transition duration-700 group-hover:scale-[1.04] motion-reduce:transform-none" priority={priority} /> : <div className="noise absolute inset-0 bg-[linear-gradient(135deg,#315f43,#173c2a)]" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
         <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white backdrop-blur"><span className={`size-2 rounded-full ${site.availableSlotCount > 0 ? "bg-[var(--lime)] shadow-[0_0_12px_var(--lime)]" : "bg-white/45"}`} />{site.availableSlotCount > 0 ? "Live availability" : "No open slots"}</span>
         <span className="absolute bottom-4 right-4 rounded-full bg-[var(--lime)] px-3 py-1.5 text-xs font-black">{site.courts.length} {site.courts.length === 1 ? "court" : "courts"}</span>
-      </div>
+      </Link>
       <div className="flex flex-1 flex-col p-6">
-        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-[var(--coral)]">{site.merchantName}</p>
-        <div className="mt-2 flex items-start justify-between gap-4"><div><h3 className="text-2xl font-black">{site.name}</h3><p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)]"><LandingIcon name="location" /> {location}</p></div><span className="rounded-full bg-[var(--cream)] px-3 py-1.5 text-[0.65rem] font-black text-[var(--forest)]">{indoorCount > 0 && indoorCount < site.courts.length ? "Mixed" : indoorCount > 0 ? "Indoor" : "Outdoor"}</span></div>
+        <Link href={`/${site.merchantSlug}`} className="w-fit text-[0.68rem] font-black uppercase tracking-[0.16em] text-[var(--coral)] hover:text-[var(--forest)]">{site.merchantName} <span aria-hidden="true">→</span></Link>
+        <div className="mt-2 flex items-start justify-between gap-4"><div><h3 className="text-2xl font-black"><Link href={href} className="decoration-[var(--lime)] decoration-4 underline-offset-4 hover:underline">{site.name}</Link></h3><p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)]"><LandingIcon name="location" /> {location}</p></div><span className="rounded-full bg-[var(--cream)] px-3 py-1.5 text-[0.65rem] font-black text-[var(--forest)]">{indoorCount > 0 && indoorCount < site.courts.length ? "Mixed" : indoorCount > 0 ? "Indoor" : "Outdoor"}</span></div>
 
         <div className="mt-5 rounded-2xl border border-[var(--line)] bg-[var(--cream)]/65 p-3">
           <div className="mb-3 flex items-center justify-between gap-3"><p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Next hourly slots</p><span className="text-[0.65rem] font-black text-[var(--forest)]">{site.availableSlotCount} open</span></div>
