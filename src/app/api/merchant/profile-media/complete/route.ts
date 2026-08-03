@@ -42,6 +42,7 @@ export async function POST(request: Request) {
   }
   if (merchant.oldPathname && merchant.oldPathname !== pathname) await deleteStoredImage(merchant.oldPathname).catch((error) => console.error("Old merchant media cleanup failed", error));
   revalidatePath("/merchant/public");
+  revalidatePath("/merchant/settings");
   revalidatePath(`/${merchant.slug}`);
   return NextResponse.json({ url });
 }

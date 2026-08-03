@@ -33,6 +33,8 @@ export const merchants = pgTable(
     currency: varchar("currency", { length: 3 }).default("PHP").notNull(),
     contactEmail: varchar("contact_email", { length: 320 }),
     contactPhone: varchar("contact_phone", { length: 40 }),
+    contactPhoneSecondary: varchar("contact_phone_secondary", { length: 40 }),
+    businessAddress: text("business_address"),
     description: text("description"),
     logoUrl: text("logo_url"),
     logoPathname: text("logo_pathname"),

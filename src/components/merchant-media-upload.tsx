@@ -6,7 +6,7 @@ import { uploadImageFromBrowser } from "@/lib/storage/upload-client";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export function MerchantMediaUpload({ merchantId, kind }: { merchantId: string; kind: "logo" | "cover" }) {
+export function MerchantMediaUpload({ merchantId, kind, returnTo = "/merchant/public" }: { merchantId: string; kind: "logo" | "cover"; returnTo?: "/merchant/public" | "/merchant/settings" }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
@@ -42,7 +42,7 @@ export function MerchantMediaUpload({ merchantId, kind }: { merchantId: string; 
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error || `The ${label} could not be saved.`);
-      window.location.assign(`/merchant/public?success=${encodeURIComponent(`${kind === "logo" ? "Logo" : "Cover photo"} uploaded.`)}`);
+      window.location.assign(`${returnTo}?success=${encodeURIComponent(`${kind === "logo" ? "Logo" : "Cover photo"} uploaded.`)}`);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : `The ${label} could not be uploaded.`);
       setBusy(false);
