@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { Brand } from "@/components/brand";
@@ -61,8 +62,9 @@ export default async function AuthPage({
           callbackUrl={callbackUrl}
         />
         <p className="mt-6 text-center text-xs leading-5 text-[var(--text-muted)]">
-          Signing in means you agree to the venue policies and Pikko.ph platform
-          terms.
+          By continuing, you agree to the venue policies and Pikko.ph{" "}
+          <Link href="/terms" className="font-bold underline underline-offset-4">Terms &amp; Conditions</Link>{" "}
+          and acknowledge the <Link href="/privacy" className="font-bold underline underline-offset-4">Privacy Policy</Link>.
         </p>
       </div>
     </main>

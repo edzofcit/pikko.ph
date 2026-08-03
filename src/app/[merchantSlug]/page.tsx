@@ -222,6 +222,8 @@ export default async function PublicMerchantPage({
           <Brand compact />
           <div className="flex items-center gap-5">
             <p>Official booking page for {merchant.name}</p>
+            <Link href="/terms" className="font-black text-[var(--forest)]">Terms</Link>
+            <Link href="/privacy" className="font-black text-[var(--forest)]">Privacy</Link>
             <Link href="/" className="font-black text-[var(--forest)]">Discover more courts →</Link>
           </div>
         </div>

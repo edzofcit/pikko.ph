@@ -276,7 +276,7 @@ export default async function LandingPreviewPage({
 
       <footer className="mx-auto flex w-full max-w-[90rem] flex-col gap-4 px-5 py-9 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
         <Brand compact />
-        <div className="flex flex-wrap gap-x-5 gap-y-2"><Link href="#courts" className="font-bold hover:text-[var(--ink)]">Find a court</Link><Link href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant" className="font-bold hover:text-[var(--ink)]">Partner Dashboard</Link><span>© 2026 Pikko.ph</span></div>
+        <div className="flex flex-wrap gap-x-5 gap-y-2"><Link href="#courts" className="font-bold hover:text-[var(--ink)]">Find a court</Link><Link href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant" className="font-bold hover:text-[var(--ink)]">Partner Dashboard</Link><Link href="/terms" className="font-bold hover:text-[var(--ink)]">Terms</Link><Link href="/privacy" className="font-bold hover:text-[var(--ink)]">Privacy</Link><span>© 2026 Pikko.ph</span></div>
       </footer>
     </main>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
   createBooking,
@@ -135,7 +136,7 @@ export function CheckoutForm({
           required
           className="mt-1"
         />
-        <span>I accept this venue&apos;s booking, payment, and cancellation policies.</span>
+        <span>I accept this venue&apos;s booking, payment, and cancellation policies and the Pikko.ph <Link href="/terms" target="_blank" className="font-black text-white underline underline-offset-4">Terms &amp; Conditions</Link>. I acknowledge the <Link href="/privacy" target="_blank" className="font-black text-white underline underline-offset-4">Privacy Policy</Link>.</span>
       </label>
 
       {state.error ? (
