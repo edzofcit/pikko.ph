@@ -1,7 +1,7 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { useState } from "react";
+import { uploadImageFromBrowser } from "@/lib/storage/upload-client";
 
 export function AdminMediaUpload({ merchantId, kind, targetId }: { merchantId: string; kind: "logo" | "cover" | "site" | "court"; targetId?: string }) {
   const [busy, setBusy] = useState(false); const [progress, setProgress] = useState(0); const [error, setError] = useState("");
@@ -10,8 +10,8 @@ export function AdminMediaUpload({ merchantId, kind, targetId }: { merchantId: s
     if (!(file instanceof File) || !file.size || file.size > 8 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setError("Choose a JPG, PNG, or WebP image up to 8 MB."); return; }
     setBusy(true); setError(""); setProgress(0); const mediaId = crypto.randomUUID(); const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"; const entity = targetId ?? merchantId; const pathname = `admin-media/${merchantId}/${kind}/${entity}/${mediaId}.${extension}`; const payload = { merchantId, kind, targetId: targetId ?? "", mediaId, altText };
     try {
-      const blob = await upload(pathname, file, { access: "private", handleUploadUrl: "/api/admin/media/upload", clientPayload: JSON.stringify(payload), onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)) });
-      const response = await fetch("/api/admin/media/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, pathname: blob.pathname }) }); const result = await response.json().catch(() => ({})) as { error?: string }; if (!response.ok) throw new Error(result.error || "The image could not be saved.");
+      const storageKey = await uploadImageFromBrowser({ file, pathname, handleUploadUrl: "/api/admin/media/upload", clientPayload: JSON.stringify(payload), onProgress: setProgress });
+      const response = await fetch("/api/admin/media/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, pathname: storageKey }) }); const result = await response.json().catch(() => ({})) as { error?: string }; if (!response.ok) throw new Error(result.error || "The image could not be saved.");
       window.location.assign(`/admin/merchants/${merchantId}?success=${encodeURIComponent("Photo uploaded and set as the current cover.")}`);
     } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "The image could not be uploaded."); setBusy(false); }
   }

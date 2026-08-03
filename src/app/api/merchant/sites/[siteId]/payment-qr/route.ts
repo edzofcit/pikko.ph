@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -10,6 +10,7 @@ import {
   MANUAL_PAYMENT_PROVIDERS,
   normalizeManualPaymentOptions,
 } from "@/lib/manual-payment/options";
+import { deleteStoredImage, isCloudinaryConfigured, uploadStoredImage } from "@/lib/storage/images";
 
 export const runtime = "nodejs";
 
@@ -178,7 +179,7 @@ export async function POST(
         ),
       );
     if (existingOption) {
-      await del(existingOption.qrImagePathname).catch((error) =>
+      await deleteStoredImage(existingOption.qrImagePathname).catch((error) =>
         console.error("Old manual payment QR cleanup failed", error),
       );
     }
@@ -200,7 +201,7 @@ export async function POST(
       303,
     );
   }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isCloudinaryConfigured() && !process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.redirect(
       venuesUrl(request, "error", "QR uploads are temporarily unavailable."),
       303,
@@ -216,15 +217,13 @@ export async function POST(
   }
 
   const extension = ALLOWED_TYPES.get(image.type)!;
-  const pathname = `manual-payment-qrs/${access.membership.merchantId}/${siteId}/${provider}-${randomUUID()}.${extension}`;
-  let uploaded: Awaited<ReturnType<typeof put>> | null = null;
+  const storageBase = `manual-payment-qrs/${access.membership.merchantId}/${siteId}/${provider}-${randomUUID()}`;
+  const pathname = `${storageBase}.${extension}`;
+  let uploadedKey = "";
   try {
-    uploaded = await put(pathname, image, {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: image.type,
-      cacheControlMaxAge: 31_536_000,
-    });
+    const cloudinaryUpload = await uploadStoredImage(image, storageBase);
+    if (cloudinaryUpload) uploadedKey = cloudinaryUpload.storageKey;
+    else uploadedKey = (await put(pathname, image, { access: "private", addRandomSuffix: false, contentType: image.type, cacheControlMaxAge: 31_536_000 })).pathname;
     const nextOptions = existingOptions.filter(
       (option) => option.provider !== provider,
     );
@@ -232,8 +231,8 @@ export async function POST(
       provider,
       label: providerLabel,
       enabled: existingOption?.enabled ?? true,
-      qrImageUrl: `/api/sites/${siteId}/payment-qr/${provider}?v=${encodeURIComponent(uploaded.pathname)}`,
-      qrImagePathname: uploaded.pathname,
+      qrImageUrl: `/api/sites/${siteId}/payment-qr/${provider}?v=${encodeURIComponent(uploadedKey)}`,
+      qrImagePathname: uploadedKey,
     });
     await db
       .update(sites)
@@ -248,8 +247,8 @@ export async function POST(
         ),
       );
   } catch (error) {
-    if (uploaded) {
-      await del(uploaded.pathname).catch((cleanupError) =>
+    if (uploadedKey) {
+      await deleteStoredImage(uploadedKey).catch((cleanupError) =>
         console.error("New manual payment QR cleanup failed", cleanupError),
       );
     }
@@ -261,7 +260,7 @@ export async function POST(
   }
 
   if (existingOption) {
-    await del(existingOption.qrImagePathname).catch((error) =>
+    await deleteStoredImage(existingOption.qrImagePathname).catch((error) =>
       console.error("Replaced manual payment QR cleanup failed", error),
     );
   }

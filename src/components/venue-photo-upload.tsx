@@ -1,7 +1,7 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { useState } from "react";
+import { uploadImageFromBrowser } from "@/lib/storage/upload-client";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -27,16 +27,17 @@ export function VenuePhotoUpload({ siteId, courtId }: { siteId: string; courtId?
     const pathname = `merchant-media/${siteId}/${entityPath}/${photoId}.${extension}`;
     const payload = JSON.stringify({ siteId, courtId: courtId ?? "", photoId, altText });
     try {
-      const blob = await upload(pathname, file, {
-        access: "private",
+      const storageKey = await uploadImageFromBrowser({
+        file,
+        pathname,
         handleUploadUrl: "/api/merchant/venue-photos/upload",
         clientPayload: payload,
-        onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
+        onProgress: setProgress,
       });
       const response = await fetch("/api/merchant/venue-photos/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId, courtId: courtId ?? "", photoId, altText, pathname: blob.pathname }),
+        body: JSON.stringify({ siteId, courtId: courtId ?? "", photoId, altText, pathname: storageKey }),
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || "The photo could not be saved.");

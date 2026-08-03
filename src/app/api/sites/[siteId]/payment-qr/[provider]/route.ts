@@ -1,4 +1,3 @@
-import { get } from "@vercel/blob";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { merchants, sites } from "@/db/schema";
@@ -6,6 +5,7 @@ import {
   isManualPaymentProvider,
   normalizeManualPaymentOptions,
 } from "@/lib/manual-payment/options";
+import { storedImageResponse } from "@/lib/storage/images";
 
 export const runtime = "nodejs";
 
@@ -36,26 +36,9 @@ export async function GET(
   const option = normalizeManualPaymentOptions(
     site?.manualPaymentOptions,
   ).find((candidate) => candidate.provider === provider);
-  if (!option || !process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!option) {
     return new Response("Not found", { status: 404 });
   }
 
-  const result = await get(option.qrImagePathname, {
-    access: "private",
-    useCache: true,
-  });
-  if (!result || result.statusCode !== 200) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  return new Response(result.stream, {
-    headers: {
-      "Content-Type": result.blob.contentType || "application/octet-stream",
-      "Content-Length": String(result.blob.size),
-      "Cache-Control": "public, max-age=60, s-maxage=60",
-      "Content-Disposition": "inline",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
-  });
+  return await storedImageResponse(option.qrImagePathname, { cacheControl: "public, max-age=60, s-maxage=60" }) ?? new Response("Not found", { status: 404 });
 }

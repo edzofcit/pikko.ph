@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
 import { syncCurrentUser } from "@/lib/auth/access";
+import { deleteStoredImage, isCloudinaryConfigured, uploadStoredImage } from "@/lib/storage/images";
 
 export const runtime = "nodejs";
 
@@ -84,8 +85,8 @@ export async function POST(
   if (notes.length > 500) {
     return redirectWithMessage(request, reference, token, "error", "Notes must be 500 characters or fewer.");
   }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN is not configured");
+  if (!isCloudinaryConfigured() && !process.env.BLOB_READ_WRITE_TOKEN) {
+    console.error("No image storage provider is configured");
     return redirectWithMessage(request, reference, token, "error", "Screenshot uploads are temporarily unavailable.");
   }
 
@@ -188,22 +189,20 @@ export async function POST(
   }
 
   const extension = ALLOWED_TYPES.get(screenshot.type)!;
-  const storagePath = `manual-payment-proofs/${booking.merchantId}/${booking.id}/${randomUUID()}.${extension}`;
-  let uploaded: Awaited<ReturnType<typeof put>> | null = null;
+  const storageBase = `manual-payment-proofs/${booking.merchantId}/${booking.id}/${randomUUID()}`;
+  const storagePath = `${storageBase}.${extension}`;
+  let uploadedKey = "";
 
   try {
-    uploaded = await put(storagePath, screenshot, {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: screenshot.type,
-      cacheControlMaxAge: 60,
-    });
+    const cloudinaryUpload = await uploadStoredImage(screenshot, storageBase, { authenticated: true });
+    if (cloudinaryUpload) uploadedKey = cloudinaryUpload.storageKey;
+    else uploadedKey = (await put(storagePath, screenshot, { access: "private", addRandomSuffix: false, contentType: screenshot.type, cacheControlMaxAge: 60 })).pathname;
     await db.batch([
       db.insert(manualPaymentProofs).values({
         merchantId: booking.merchantId,
         bookingId: booking.id,
         paymentId: booking.paymentId,
-        storageKey: uploaded.pathname,
+        storageKey: uploadedKey,
         originalFilename: screenshot.name.slice(0, 255) || `payment-proof.${extension}`,
         mimeType: screenshot.type,
         sizeBytes: screenshot.size,
@@ -219,8 +218,8 @@ export async function POST(
         .where(eq(payments.id, booking.paymentId)),
     ]);
   } catch (error) {
-    if (uploaded) {
-      await del(uploaded.pathname).catch((cleanupError) =>
+    if (uploadedKey) {
+      await deleteStoredImage(uploadedKey).catch((cleanupError) =>
         console.error("Payment proof cleanup failed", cleanupError),
       );
     }

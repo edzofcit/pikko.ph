@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { del } from "@vercel/blob";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -17,6 +16,7 @@ import {
 } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { toSlug } from "@/lib/slug";
+import { deleteStoredImage } from "@/lib/storage/images";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -293,7 +293,7 @@ export async function deleteVenuePhoto(formData: FormData) {
       if (next) await db.update(sitePhotos).set({ isCover: true }).where(eq(sitePhotos.id, next.id));
     }
   }
-  await del(pathname).catch((error) => console.error("Venue photo blob cleanup failed", error));
+  await deleteStoredImage(pathname).catch((error) => console.error("Venue photo cleanup failed", error));
   await db.insert(auditEvents).values({ merchantId: access.membership.merchantId, actorUserId: access.user.id, action: "venue_photo.deleted", targetType: courtId ? "court" : "site", targetId: courtId || siteId, before: { pathname } });
   revalidatePath("/merchant/sites");
   redirect(previewUrl(siteId, "photos", "Photo deleted."));

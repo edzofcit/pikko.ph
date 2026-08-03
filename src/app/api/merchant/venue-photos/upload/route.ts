@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
+import { createDirectImageUpload } from "@/lib/storage/images";
 
 export const runtime = "nodejs";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -11,7 +12,20 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export async function POST(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   const access = await requireMerchantPermission("manage_courts");
-  const body = await request.json() as HandleUploadBody;
+  const body = await request.json() as HandleUploadBody & { action?: string; pathname?: string; clientPayload?: string };
+  if (body.action === "cloudinary-sign") {
+    let payload: { siteId?: string; courtId?: string; photoId?: string; altText?: string };
+    try { payload = JSON.parse(body.clientPayload ?? "{}"); } catch { return NextResponse.json({ error: "Invalid upload details." }, { status: 400 }); }
+    const siteId = payload.siteId ?? ""; const courtId = payload.courtId ?? ""; const photoId = payload.photoId ?? "";
+    if (!UUID.test(siteId) || !UUID.test(photoId) || (courtId && !UUID.test(courtId)) || String(payload.altText ?? "").length > 200) return NextResponse.json({ error: "Invalid upload details." }, { status: 400 });
+    const db = getDb(); const [site] = await db.select({ id: sites.id }).from(sites).where(and(eq(sites.id, siteId), eq(sites.merchantId, access.membership.merchantId))).limit(1);
+    if (!site || (access.membership.role !== "owner" && !access.sites.some((candidate) => candidate.id === siteId))) return NextResponse.json({ error: "You cannot update that site." }, { status: 403 });
+    if (courtId) { const [court] = await db.select({ id: courts.id }).from(courts).where(and(eq(courts.id, courtId), eq(courts.siteId, siteId), eq(courts.merchantId, access.membership.merchantId))).limit(1); if (!court) return NextResponse.json({ error: "Court not found." }, { status: 404 }); }
+    const entityPath = courtId ? `courts/${courtId}` : `sites/${siteId}`;
+    const expectedBase = `merchant-media/${siteId}/${entityPath}/${photoId}`;
+    if (!body.pathname?.startsWith(`${expectedBase}.`)) return NextResponse.json({ error: "Invalid upload pathname." }, { status: 400 });
+    return NextResponse.json(createDirectImageUpload(expectedBase) ?? { provider: "vercel" });
+  }
   const result = await handleUpload({
     request,
     body,

@@ -1,4 +1,3 @@
-import { get } from "@vercel/blob";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -9,6 +8,7 @@ import {
 } from "@/db/schema";
 import { getMerchantAccess, syncCurrentUser } from "@/lib/auth/access";
 import { hashBookingAccessToken } from "@/lib/booking/access-token";
+import { storedImageResponse } from "@/lib/storage/images";
 
 export const runtime = "nodejs";
 
@@ -85,21 +85,5 @@ export async function GET(
   }
 
   if (!authorized) return new Response("Not found", { status: 404 });
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return new Response("Storage unavailable", { status: 503 });
-  }
-
-  const result = await get(proof.storageKey, { access: "private", useCache: false });
-  if (!result || result.statusCode !== 200) return new Response("Not found", { status: 404 });
-
-  return new Response(result.stream, {
-    headers: {
-      "Content-Type": result.blob.contentType || proof.mimeType,
-      "Content-Length": String(result.blob.size),
-      "Cache-Control": "private, no-store",
-      "Content-Disposition": "inline",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
-  });
+  return await storedImageResponse(proof.storageKey, { cacheControl: "private, no-store", fallbackContentType: proof.mimeType }) ?? new Response("Not found", { status: 404 });
 }

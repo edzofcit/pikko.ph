@@ -1,7 +1,7 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { useState } from "react";
+import { uploadImageFromBrowser } from "@/lib/storage/upload-client";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -28,16 +28,17 @@ export function MerchantMediaUpload({ merchantId, kind }: { merchantId: string; 
     const clientPayload = JSON.stringify({ merchantId, kind, mediaId });
 
     try {
-      const blob = await upload(pathname, file, {
-        access: "private",
+      const storageKey = await uploadImageFromBrowser({
+        file,
+        pathname,
         handleUploadUrl: "/api/merchant/profile-media/upload",
         clientPayload,
-        onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
+        onProgress: setProgress,
       });
       const response = await fetch("/api/merchant/profile-media/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchantId, kind, mediaId, pathname: blob.pathname }),
+        body: JSON.stringify({ merchantId, kind, mediaId, pathname: storageKey }),
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error || `The ${label} could not be saved.`);
