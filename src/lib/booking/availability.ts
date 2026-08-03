@@ -22,6 +22,8 @@ import {
   siteOperatingHours,
   sites,
 } from "@/db/schema";
+import type { ManualPaymentOption } from "@/lib/manual-payment/options";
+import { enabledManualPaymentOptions } from "@/lib/manual-payment/options";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -32,6 +34,23 @@ export type AvailableSlot = {
   rateCents: number;
 };
 
+export type AvailabilitySlotState =
+  | "available"
+  | "booked"
+  | "held"
+  | "blocked"
+  | "closed"
+  | "past"
+  | "unavailable";
+
+export type AvailabilityScheduleSlot = {
+  startsAt: string;
+  endsAt: string;
+  label: string;
+  rateCents: number | null;
+  state: AvailabilitySlotState;
+};
+
 export type CourtAvailability = {
   id: string;
   name: string;
@@ -40,10 +59,17 @@ export type CourtAvailability = {
   surfaceType: string | null;
   baseHourlyRateCents: number;
   slots: AvailableSlot[];
+  schedule: AvailabilityScheduleSlot[];
 };
 
 export type SiteAvailability = {
-  merchant: { id: string; name: string; slug: string };
+  merchant: {
+    id: string;
+    name: string;
+    slug: string;
+    contactEmail: string | null;
+    gatewayFeeBasisPoints: number;
+  };
   site: {
     id: string;
     name: string;
@@ -52,7 +78,10 @@ export type SiteAvailability = {
     addressLine1: string;
     city: string;
     province: string | null;
+    latitude: string | null;
+    longitude: string | null;
     timezone: string;
+    contactEmail: string | null;
     amenities: string[];
     bookingLeadMinutes: number;
     advanceBookingDays: number;
@@ -61,6 +90,7 @@ export type SiteAvailability = {
     manualReservationMode: "reserve_immediately" | "reserve_after_verification";
     manualPaymentDeadlineMinutes: number;
     manualPaymentInstructions: string | null;
+    manualPaymentOptions: ManualPaymentOption[];
   };
   date: string;
   earliestDate: string;
@@ -233,6 +263,9 @@ export async function getSiteAvailability(
       merchantId: merchants.id,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
+      merchantContactEmail: merchants.contactEmail,
+      onlinePaymentsAllowed: merchants.onlinePaymentsAllowed,
+      gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
       siteId: sites.id,
       siteName: sites.name,
       siteSlug: sites.slug,
@@ -240,7 +273,10 @@ export async function getSiteAvailability(
       addressLine1: sites.addressLine1,
       city: sites.city,
       province: sites.province,
+      latitude: sites.latitude,
+      longitude: sites.longitude,
       timezone: sites.timezone,
+      siteContactEmail: sites.contactEmail,
       amenities: sites.amenities,
       bookingLeadMinutes: sites.bookingLeadMinutes,
       advanceBookingDays: sites.advanceBookingDays,
@@ -249,6 +285,7 @@ export async function getSiteAvailability(
       manualReservationMode: sites.manualReservationMode,
       manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
       manualPaymentInstructions: sites.manualPaymentInstructions,
+      manualPaymentOptions: sites.manualPaymentOptions,
     })
     .from(sites)
     .innerJoin(merchants, eq(sites.merchantId, merchants.id))
@@ -303,7 +340,13 @@ export async function getSiteAvailability(
 
   if (courtRows.length === 0) {
     return {
-      merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug },
+      merchant: {
+        id: venue.merchantId,
+        name: venue.merchantName,
+        slug: venue.merchantSlug,
+        contactEmail: venue.merchantContactEmail,
+        gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints,
+      },
       site: {
         id: venue.siteId,
         name: venue.siteName,
@@ -312,15 +355,22 @@ export async function getSiteAvailability(
         addressLine1: venue.addressLine1,
         city: venue.city,
         province: venue.province,
+        latitude: venue.latitude,
+        longitude: venue.longitude,
         timezone: venue.timezone,
+        contactEmail: venue.siteContactEmail,
         amenities: venue.amenities,
         bookingLeadMinutes: venue.bookingLeadMinutes,
         advanceBookingDays: venue.advanceBookingDays,
-        onlinePaymentEnabled: venue.onlinePaymentEnabled,
+        onlinePaymentEnabled:
+          venue.onlinePaymentsAllowed && venue.onlinePaymentEnabled,
         manualPaymentEnabled: venue.manualPaymentEnabled,
         manualReservationMode: venue.manualReservationMode,
         manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
         manualPaymentInstructions: venue.manualPaymentInstructions,
+        manualPaymentOptions: enabledManualPaymentOptions(
+          venue.manualPaymentOptions,
+        ),
       },
       date,
       earliestDate,
@@ -375,6 +425,7 @@ export async function getSiteAvailability(
         courtId: courtAllocations.courtId,
         startsAt: courtAllocations.startsAt,
         endsAt: courtAllocations.endsAt,
+        kind: courtAllocations.kind,
       })
       .from(courtAllocations)
       .where(
@@ -406,7 +457,9 @@ export async function getSiteAvailability(
 
   const siteOverride = overrides.find((override) => override.courtId === null);
   const leadThreshold = new Date(now.getTime() + venue.bookingLeadMinutes * 60_000);
-  const availability = courtRows.map<CourtAvailability>((court) => {
+  const periodsByCourt = new Map<string, Period[]>();
+
+  for (const court of courtRows) {
     const courtOverride = overrides.find((override) => override.courtId === court.id);
     const weeklyCourtHours = courtHours.filter((hours) => hours.courtId === court.id);
     let periods: Period[];
@@ -425,13 +478,30 @@ export async function getSiteAvailability(
       periods = weeklyCourtHours.length > 0 ? weeklyCourtHours : siteHours;
     }
 
-    const courtBlocks = allocations.filter((allocation) => allocation.courtId === court.id);
-    const generatedSlots = periods.flatMap((period) => {
-      const opens = timeParts(period.opensAt).totalMinutes;
-      const closes = timeParts(period.closesAt).totalMinutes;
-      const generated: AvailableSlot[] = [];
+    periodsByCourt.set(court.id, periods);
+  }
 
-      for (let startMinute = opens; startMinute + 60 <= closes; startMinute += 60) {
+  const activePeriods = Array.from(periodsByCourt.values()).flat();
+  const fallbackPeriods = [
+    ...siteHours,
+    ...courtHours.map(({ opensAt, closesAt }) => ({ opensAt, closesAt })),
+  ];
+  const gridPeriods = activePeriods.length > 0 ? activePeriods : fallbackPeriods;
+  const gridOpens = gridPeriods.length
+    ? Math.min(...gridPeriods.map((period) => timeParts(period.opensAt).totalMinutes))
+    : null;
+  const gridCloses = gridPeriods.length
+    ? Math.max(...gridPeriods.map((period) => timeParts(period.closesAt).totalMinutes))
+    : null;
+
+  const availability = courtRows.map<CourtAvailability>((court) => {
+    const periods = periodsByCourt.get(court.id) ?? [];
+
+    const courtBlocks = allocations.filter((allocation) => allocation.courtId === court.id);
+    const schedule: AvailabilityScheduleSlot[] = [];
+
+    if (gridOpens !== null && gridCloses !== null) {
+      for (let startMinute = gridOpens; startMinute + 60 <= gridCloses; startMinute += 60) {
         const startHour = Math.floor(startMinute / 60);
         const startMinutePart = startMinute % 60;
         const endMinute = startMinute + 60;
@@ -447,39 +517,68 @@ export async function getSiteAvailability(
           `${String(endHour % 24).padStart(2, "0")}:${String(endMinutePart).padStart(2, "0")}`,
           venue.timezone,
         );
+        const withinOperatingHours = periods.some((period) => {
+          const opens = timeParts(period.opensAt).totalMinutes;
+          const closes = timeParts(period.closesAt).totalMinutes;
+          return startMinute >= opens && endMinute <= closes;
+        });
+        const allocation = courtBlocks.find((block) =>
+          overlaps(startsAt, endsAt, block.startsAt, block.endsAt),
+        );
+        const rateCents = withinOperatingHours
+          ? matchingRate(
+              rules,
+              court.id,
+              date,
+              dayOfWeek,
+              startMinute,
+              endMinute,
+              court.baseHourlyRateCents,
+            )
+          : null;
+        let state: AvailabilitySlotState;
 
-        const unavailable =
-          startsAt < leadThreshold ||
-          courtBlocks.some((block) => overlaps(startsAt, endsAt, block.startsAt, block.endsAt));
-        if (unavailable) continue;
+        if (!withinOperatingHours) state = "closed";
+        else if (startsAt < now) state = "past";
+        else if (allocation?.kind === "booking") state = "booked";
+        else if (allocation?.kind === "checkout_hold") state = "held";
+        else if (allocation?.kind === "merchant_block") state = "blocked";
+        else if (startsAt < leadThreshold) state = "unavailable";
+        else state = "available";
 
-        generated.push({
+        schedule.push({
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
           label: formatSlotLabel(startsAt, venue.timezone),
-          rateCents: matchingRate(
-            rules,
-            court.id,
-            date,
-            dayOfWeek,
-            startMinute,
-            endMinute,
-            court.baseHourlyRateCents,
-          ),
+          rateCents,
+          state,
         });
       }
+    }
 
-      return generated;
-    });
-    const slots = Array.from(
-      new Map(generatedSlots.map((slot) => [slot.startsAt, slot])).values(),
-    ).sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+    const slots = schedule
+      .filter(
+        (slot): slot is AvailabilityScheduleSlot & { rateCents: number } =>
+          slot.state === "available" && slot.rateCents !== null,
+      )
+      .map(({ startsAt, endsAt, label, rateCents }) => ({
+        startsAt,
+        endsAt,
+        label,
+        rateCents,
+      }));
 
-    return { ...court, slots };
+    return { ...court, slots, schedule };
   });
 
   return {
-    merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug },
+    merchant: {
+      id: venue.merchantId,
+      name: venue.merchantName,
+      slug: venue.merchantSlug,
+      contactEmail: venue.merchantContactEmail,
+      gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints,
+    },
     site: {
       id: venue.siteId,
       name: venue.siteName,
@@ -488,15 +587,22 @@ export async function getSiteAvailability(
       addressLine1: venue.addressLine1,
       city: venue.city,
       province: venue.province,
+      latitude: venue.latitude,
+      longitude: venue.longitude,
       timezone: venue.timezone,
+      contactEmail: venue.siteContactEmail,
       amenities: venue.amenities,
       bookingLeadMinutes: venue.bookingLeadMinutes,
       advanceBookingDays: venue.advanceBookingDays,
-      onlinePaymentEnabled: venue.onlinePaymentEnabled,
+      onlinePaymentEnabled:
+        venue.onlinePaymentsAllowed && venue.onlinePaymentEnabled,
       manualPaymentEnabled: venue.manualPaymentEnabled,
       manualReservationMode: venue.manualReservationMode,
       manualPaymentDeadlineMinutes: venue.manualPaymentDeadlineMinutes,
       manualPaymentInstructions: venue.manualPaymentInstructions,
+      manualPaymentOptions: enabledManualPaymentOptions(
+        venue.manualPaymentOptions,
+      ),
     },
     date,
     earliestDate,

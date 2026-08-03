@@ -9,9 +9,14 @@ export default function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return getAuth().middleware({ loginUrl: "/auth/sign-in" })(request);
+  const callbackUrl = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const loginUrl = request.nextUrl.pathname.startsWith("/admin")
+    ? `/auth/sign-in?audience=admin&callbackURL=${encodeURIComponent(callbackUrl)}`
+    : "/auth/sign-in";
+
+  return getAuth().middleware({ loginUrl })(request);
 }
 
 export const config = {
-  matcher: ["/merchant/:path*", "/admin/:path*"],
+  matcher: ["/customer/:path*", "/merchant/:path*", "/admin/:path*", "/account/:path*"],
 };

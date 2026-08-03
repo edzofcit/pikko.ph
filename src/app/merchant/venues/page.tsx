@@ -1,11 +1,17 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { DashboardShell } from "@/components/dashboard-shell";
+import { MerchantPageShell } from "@/components/merchant-page-shell";
+import { SiteLocationPicker } from "@/components/site-location-picker";
 import { getDb } from "@/db";
 import { courts, sites } from "@/db/schema";
 import { requireMerchantPermission } from "@/lib/auth/access";
 import { formatMerchantRole } from "@/lib/auth/permissions";
+import {
+  MANUAL_PAYMENT_PROVIDERS,
+  normalizeManualPaymentOptions,
+} from "@/lib/manual-payment/options";
 import {
   createCourt,
   createSite,
@@ -53,6 +59,7 @@ export default async function MerchantVenuesPage({
             manualReservationMode: sites.manualReservationMode,
             manualPaymentDeadlineMinutes: sites.manualPaymentDeadlineMinutes,
             manualPaymentInstructions: sites.manualPaymentInstructions,
+            manualPaymentOptions: sites.manualPaymentOptions,
           })
           .from(sites)
           .where(
@@ -86,20 +93,16 @@ export default async function MerchantVenuesPage({
   const isOwner = access.membership.role === "owner";
 
   const feedbackKey = (query.success ?? query.error) as keyof typeof feedback;
-  const feedbackMessage = feedback[feedbackKey];
+  const feedbackMessage =
+    feedback[feedbackKey] ?? query.success ?? query.error;
   const feedbackIsError = Boolean(query.error);
 
   return (
-    <DashboardShell
-      eyebrow={`Sites and courts · ${access.membership.merchantName}`}
+    <MerchantPageShell
+      merchantName={access.membership.merchantName} merchantSlug={access.membership.merchantSlug} userName={access.user.fullName} userEmail={access.user.email} roleLabel={formatMerchantRole(access.membership.role)} permissions={access.permissions} sites={access.sites} selectedSiteId="" activeHref="/merchant/sites"
+      eyebrow="Sites and courts"
       title="Set up where customers play."
       description="Create each physical venue as a site, then add its courts and standard hourly rates. Courts inherit the site's operating hours until you add an override."
-      navigation={[
-        { href: "/merchant", label: "Dashboard" },
-        ...(access.permissions.includes("manage_staff")
-          ? [{ href: "/merchant/team", label: "Team" }]
-          : []),
-      ]}
       metrics={[
         { label: "Active sites", value: String(venueSites.length), note: "Physical venue locations" },
         { label: "Active courts", value: String(venueCourts.filter((court) => court.status === "active").length), note: "Bookable inventory" },
@@ -145,6 +148,7 @@ export default async function MerchantVenuesPage({
               Province <span className="font-normal">(optional)</span>
               <input name="province" maxLength={100} autoComplete="address-level1" className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 font-normal" />
             </label>
+            <SiteLocationPicker tileUrl={process.env.OSM_TILE_URL} />
             <label className="block text-sm font-bold">
               Opens
               <input name="opensAt" type="time" required defaultValue="06:00" className="mt-2 w-full rounded-xl border border-[var(--line)] px-4 py-3 font-normal" />
@@ -215,6 +219,9 @@ export default async function MerchantVenuesPage({
         <div className="divide-y divide-[var(--line)]">
           {venueSites.map((site) => {
             const siteCourts = venueCourts.filter((court) => court.siteId === site.id);
+            const paymentOptions = normalizeManualPaymentOptions(
+              site.manualPaymentOptions,
+            );
             return (
               <article key={site.id} className="px-5 py-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -291,6 +298,100 @@ export default async function MerchantVenuesPage({
                       Save payment settings
                     </button>
                   </form>
+                  <div className="mt-6 border-t border-[var(--line)] pt-5">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">
+                      Customer QR payment options
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                      Upload one QR image per channel. Configured channels appear as selectable options during manual checkout.
+                    </p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {MANUAL_PAYMENT_PROVIDERS.map((provider) => {
+                        const currentOption = paymentOptions.find(
+                          (option) => option.provider === provider.id,
+                        );
+                        return (
+                          <div key={provider.id} className="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-black">{provider.label}</p>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${currentOption?.enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                                {currentOption
+                                  ? currentOption.enabled
+                                    ? "Visible"
+                                    : "Disabled"
+                                  : "Not set"}
+                              </span>
+                            </div>
+                            {currentOption ? (
+                              <Image
+                                src={currentOption.qrImageUrl}
+                                alt={`${provider.label} payment QR`}
+                                width={500}
+                                height={500}
+                                sizes="240px"
+                                className="mt-3 aspect-square w-full rounded-lg border border-[var(--line)] bg-white object-contain"
+                              />
+                            ) : null}
+                            {currentOption ? (
+                              <form
+                                action={`/api/merchant/sites/${site.id}/payment-qr`}
+                                method="post"
+                                className="mt-3"
+                              >
+                                <input type="hidden" name="provider" value={provider.id} />
+                                <input type="hidden" name="operation" value="toggle" />
+                                <input type="hidden" name="enabled" value={currentOption.enabled ? "false" : "true"} />
+                                <button
+                                  type="submit"
+                                  role="switch"
+                                  aria-checked={currentOption.enabled}
+                                  className="flex w-full items-center justify-between rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-black"
+                                >
+                                  <span>Show at checkout</span>
+                                  <span className={`relative h-6 w-11 rounded-full transition ${currentOption.enabled ? "bg-[var(--forest)]" : "bg-slate-300"}`} aria-hidden="true">
+                                    <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${currentOption.enabled ? "left-6" : "left-1"}`} />
+                                  </span>
+                                </button>
+                              </form>
+                            ) : null}
+                            <form
+                              action={`/api/merchant/sites/${site.id}/payment-qr`}
+                              method="post"
+                              encType="multipart/form-data"
+                              className="mt-3 space-y-3"
+                            >
+                              <input type="hidden" name="provider" value={provider.id} />
+                              <input type="hidden" name="operation" value="upload" />
+                              <input
+                                type="file"
+                                name="qrImage"
+                                accept="image/jpeg,image/png,image/webp"
+                                required
+                                className="block w-full text-xs file:mr-2 file:rounded-full file:border-0 file:bg-[var(--forest)] file:px-3 file:py-2 file:text-xs file:font-black file:text-white"
+                              />
+                              <button className="w-full rounded-full bg-[var(--forest)] px-3 py-2 text-xs font-black text-white">
+                                {currentOption ? "Replace QR image" : "Upload QR image"}
+                              </button>
+                            </form>
+                            {currentOption ? (
+                              <form
+                                action={`/api/merchant/sites/${site.id}/payment-qr`}
+                                method="post"
+                                className="mt-2"
+                              >
+                                <input type="hidden" name="provider" value={provider.id} />
+                                <input type="hidden" name="operation" value="remove" />
+                                <button className="w-full rounded-full border border-red-200 px-3 py-2 text-xs font-black text-red-700">
+                                  Remove option
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">JPG, PNG, or WebP · maximum 3 MB per image.</p>
+                  </div>
                 </details>
                 {siteCourts.length > 0 ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -397,6 +498,6 @@ export default async function MerchantVenuesPage({
           ) : null}
         </div>
       </section>
-    </DashboardShell>
+    </MerchantPageShell>
   );
 }

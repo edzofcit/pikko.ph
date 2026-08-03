@@ -11,7 +11,10 @@ This first application baseline includes:
 - Real public merchant and site routes backed by tenant-scoped court, schedule,
   allocation, and pricing data.
 - Guest manual-payment booking requests with atomic court allocation, secure
-  booking links, merchant instructions, and configurable payment deadlines.
+  booking links, merchant instructions, configurable payment deadlines, and
+  private screenshot review. Guests receive the secure return link by email.
+- Distinct customer and merchant workspaces backed by one shared identity, so
+  venue operators can switch into customer mode without a second account.
 - Merchant and platform-administrator dashboard shells.
 - A Vercel-friendly health endpoint at `/api/health`.
 - A Neon PostgreSQL schema managed with Drizzle migrations.
@@ -20,11 +23,11 @@ This first application baseline includes:
 - Environment placeholders for authentication, Maya, and email.
 - The product requirements in [`SOFTWARE_REQUIREMENTS.md`](./SOFTWARE_REQUIREMENTS.md).
 
-The landing-page preview still contains sample presentation data. Public routes
-at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}` use persisted venue
-data, revalidate selected slots at checkout, and write manual-payment bookings
-using the database overlap guard. The merchant dashboard reads recent bookings
-from persisted data.
+The landing page lists active marketplace sites and courts from persisted venue
+data. Public routes at `/{merchant-slug}` and `/{merchant-slug}/{site-slug}`
+revalidate selected slots at checkout and write manual-payment bookings using
+the database overlap guard. The merchant dashboard reads recent bookings from
+persisted data.
 
 ## Run locally
 
@@ -67,9 +70,28 @@ Neon provisions `NEON_AUTH_BASE_URL`. Add a unique `NEON_AUTH_COOKIE_SECRET` of 
 
 Vercel runs committed migrations before each build. Drizzle records applied migrations, so unchanged migrations are skipped. A failed migration stops the deployment before the new application version goes live.
 
+## Private payment-proof storage
+
+Manual-payment screenshots use a **private** Vercel Blob store. In the Vercel
+project, create or connect a private Blob store and make its
+`BLOB_READ_WRITE_TOKEN` available to Preview and Production. The token must
+remain server-only. Locally, add the Development store token to `.env.local`.
+
+Uploads accept JPG, PNG, and WebP images up to 3 MB. Files are never linked
+directly: authenticated application routes stream them only to the booking's
+private guest link or authorized merchant staff.
+
 ## Deployment
 
 Import the GitHub repository into Vercel. Next.js build settings are detected automatically. Configure secrets in Vercel for Preview and Production rather than committing `.env.local`.
+
+Booking emails use Resend. Connect Resend to the Vercel project so it injects
+`RESEND_API_KEY`, then set `EMAIL_FROM` to a sender on a verified domain. Until
+the domain is verified, Resend's testing sender can only deliver within its
+testing restrictions. `APP_URL` is optional; when omitted, booking links use
+the checkout request's origin. Customer booking email remains off unless
+`BOOKING_EMAIL_ENABLED=true`; the protected Admin test mailer can be used while
+that flag is off.
 
 ## Planned implementation sequence
 
@@ -77,5 +99,5 @@ Import the GitHub repository into Vercel. Next.js build settings are detected au
 2. Sites, courts, hours, closures, and pricing services.
 3. Atomic availability holds and booking state transitions.
 4. Maya Dynamic QR Ph payment adapter and webhook reconciliation.
-5. Manual payment proof workflow and transactional email.
+5. Payment-state, cancellation, refund, and reminder emails.
 6. Reporting, subscriptions, audit trail, and production hardening.

@@ -26,6 +26,7 @@ import {
   siteStatusEnum,
 } from "./enums";
 import { merchantMemberships, merchants, users } from "./identity";
+import type { ManualPaymentOption } from "@/lib/manual-payment/options";
 
 export const sites = pgTable(
   "sites",
@@ -55,7 +56,7 @@ export const sites = pgTable(
     policies: jsonb("policies").$type<JsonObject>().default({}).notNull(),
     bookingLeadMinutes: integer("booking_lead_minutes").default(60).notNull(),
     advanceBookingDays: integer("advance_booking_days").default(30).notNull(),
-    onlinePaymentEnabled: boolean("online_payment_enabled").default(true).notNull(),
+    onlinePaymentEnabled: boolean("online_payment_enabled").default(false).notNull(),
     manualPaymentEnabled: boolean("manual_payment_enabled").default(false).notNull(),
     manualReservationMode: manualReservationModeEnum("manual_reservation_mode")
       .default("reserve_immediately")
@@ -65,6 +66,10 @@ export const sites = pgTable(
       .notNull(),
     manualPaymentInstructions: text("manual_payment_instructions"),
     manualPaymentQrUrl: text("manual_payment_qr_url"),
+    manualPaymentOptions: jsonb("manual_payment_options")
+      .$type<ManualPaymentOption[]>()
+      .default([])
+      .notNull(),
     taxInclusive: boolean("tax_inclusive").default(true).notNull(),
     taxBasisPoints: integer("tax_basis_points").default(0).notNull(),
     ...timestamps(),
@@ -157,6 +162,70 @@ export const courts = pgTable(
       "courts_base_hourly_rate_nonnegative",
       sql`${table.baseHourlyRateCents} >= 0`,
     ),
+  ],
+);
+
+export const sitePhotos = pgTable(
+  "site_photos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id, { onDelete: "cascade" }),
+    siteId: uuid("site_id").notNull(),
+    url: text("url").notNull(),
+    pathname: text("pathname").notNull(),
+    altText: varchar("alt_text", { length: 200 }),
+    isCover: boolean("is_cover").default(false).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.merchantId, table.siteId],
+      foreignColumns: [sites.merchantId, sites.id],
+      name: "site_photos_site_tenant_fk",
+    }).onDelete("cascade"),
+    uniqueIndex("site_photos_pathname_uidx").on(table.pathname),
+    uniqueIndex("site_photos_single_cover_uidx")
+      .on(table.siteId)
+      .where(sql`${table.isCover}`),
+    index("site_photos_site_order_idx").on(table.siteId, table.sortOrder),
+  ],
+);
+
+export const courtPhotos = pgTable(
+  "court_photos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id, { onDelete: "cascade" }),
+    courtId: uuid("court_id").notNull(),
+    url: text("url").notNull(),
+    pathname: text("pathname").notNull(),
+    altText: varchar("alt_text", { length: 200 }),
+    isCover: boolean("is_cover").default(false).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.merchantId, table.courtId],
+      foreignColumns: [courts.merchantId, courts.id],
+      name: "court_photos_court_tenant_fk",
+    }).onDelete("cascade"),
+    uniqueIndex("court_photos_pathname_uidx").on(table.pathname),
+    uniqueIndex("court_photos_single_cover_uidx")
+      .on(table.courtId)
+      .where(sql`${table.isCover}`),
+    index("court_photos_court_order_idx").on(table.courtId, table.sortOrder),
   ],
 );
 

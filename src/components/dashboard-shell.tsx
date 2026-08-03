@@ -10,6 +10,7 @@ export function DashboardShell({
   description,
   metrics,
   navigation = [],
+  primaryAction,
   children,
 }: {
   eyebrow: string;
@@ -17,48 +18,61 @@ export function DashboardShell({
   description: string;
   metrics: Metric[];
   navigation?: { href: string; label: string }[];
+  primaryAction?: { href: string; label: string };
   children: React.ReactNode;
 }) {
   return (
     <main className="min-h-screen bg-[#f4f5ef]">
-      <header className="border-b border-[var(--line)] bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-10">
           <Brand />
           <div className="flex items-center gap-3">
-            {navigation.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="hidden rounded-full px-3 py-2 text-sm font-bold text-[var(--forest)] hover:bg-[var(--cream)] sm:inline-flex"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <Link href="/" className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-bold hover:bg-[var(--cream)]">
-              View marketplace
+            <Link href="/" className="rounded-full border border-[var(--line)] px-3 py-2 text-xs font-bold hover:bg-[var(--cream)] sm:px-4 sm:text-sm">
+              Marketplace
             </Link>
             <AccountButton />
           </div>
         </div>
+        {navigation.length ? (
+          <nav
+            aria-label="Workspace navigation"
+            className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-5 pb-3 sm:px-8 lg:px-10"
+          >
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="shrink-0 rounded-full bg-[var(--cream)] px-4 py-2 text-xs font-black text-[var(--forest)] transition hover:bg-[var(--mint)]"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
       </header>
 
-      <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--coral)]">{eyebrow}</p>
             <h1 className="display-type mt-3 text-4xl font-black sm:text-5xl">{title}</h1>
             <p className="mt-4 max-w-2xl leading-7 text-[var(--text-muted)]">{description}</p>
           </div>
-          <button type="button" className="w-fit rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-bold text-white">
-            + New action
-          </button>
+          {primaryAction ? (
+            <Link
+              href={primaryAction.href}
+              className="inline-flex w-fit items-center rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_30px_rgb(23_60_42_/_18%)]"
+            >
+              {primaryAction.label}
+            </Link>
+          ) : null}
         </div>
 
-        <section className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Summary metrics">
+        <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary metrics">
           {metrics.map((metric) => (
-            <article key={metric.label} className="rounded-2xl border border-[var(--line)] bg-white p-5">
+            <article key={metric.label} className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
               <p className="text-xs font-semibold text-[var(--text-muted)]">{metric.label}</p>
-              <p className="mt-3 text-3xl font-black tracking-[-0.05em]">{metric.value}</p>
+              <p className="mt-2 text-2xl font-black tracking-[-0.05em] sm:text-3xl">{metric.value}</p>
               <p className="mt-2 text-xs text-[var(--forest)]">{metric.note}</p>
             </article>
           ))}

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -33,15 +34,27 @@ export const merchants = pgTable(
     currency: varchar("currency", { length: 3 }).default("PHP").notNull(),
     contactEmail: varchar("contact_email", { length: 320 }),
     contactPhone: varchar("contact_phone", { length: 40 }),
+    contactPhoneSecondary: varchar("contact_phone_secondary", { length: 40 }),
+    businessAddress: text("business_address"),
+    description: text("description"),
     logoUrl: text("logo_url"),
+    logoPathname: text("logo_pathname"),
+    coverUrl: text("cover_url"),
+    coverPathname: text("cover_pathname"),
     subscriptionStatus: subscriptionStatusEnum("subscription_status")
       .default("trialing")
       .notNull(),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP + interval '14 days'`)
+      .notNull(),
     monthlyCourtPriceCents: integer("monthly_court_price_cents")
-      .default(0)
+      .default(59900)
       .notNull(),
     gatewayFeeBasisPoints: integer("gateway_fee_basis_points")
       .default(0)
+      .notNull(),
+    onlinePaymentsAllowed: boolean("online_payments_allowed")
+      .default(false)
       .notNull(),
     ...timestamps(),
   },

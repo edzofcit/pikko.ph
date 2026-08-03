@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSiteAvailability } from "@/lib/booking/availability";
+import { syncCurrentUser } from "@/lib/auth/access";
+import { ensureCustomerProfile } from "@/lib/customer/profile";
 import { formatPeso } from "@/lib/money";
+import { getMayaConfig } from "@/lib/payments/maya";
 import { CheckoutForm } from "./checkout-form";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +17,15 @@ export default async function CheckoutReviewPage({
   searchParams: Promise<{ date?: string; court?: string; starts?: string }>;
 }) {
   const [{ merchantSlug, siteSlug }, query] = await Promise.all([params, searchParams]);
-  const availability = await getSiteAvailability(merchantSlug, siteSlug, query.date);
+  const [availability, signedInUser, mayaConfig] = await Promise.all([
+    getSiteAvailability(merchantSlug, siteSlug, query.date),
+    syncCurrentUser(),
+    getMayaConfig(),
+  ]);
   if (!availability) notFound();
+  const customerProfile = signedInUser
+    ? await ensureCustomerProfile(signedInUser)
+    : null;
 
   const requestedStarts = (query.starts ?? "")
     .split(",")
@@ -55,6 +65,12 @@ export default async function CheckoutReviewPage({
   }
 
   const totalCents = selectedSlots.reduce((total, slot) => total + slot.rateCents, 0);
+  const checkoutHref = `/${availability.merchant.slug}/${availability.site.slug}/checkout?${new URLSearchParams({
+    date: availability.date,
+    court: court.id,
+    starts: selectedSlots.map((slot) => slot.startsAt).join(","),
+  }).toString()}`;
+  const customerAuthHref = `/auth/sign-up?audience=customer&callbackURL=${encodeURIComponent(checkoutHref)}`;
 
   return (
     <main className="min-h-screen">
@@ -65,10 +81,18 @@ export default async function CheckoutReviewPage({
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-5xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_22rem]">
+      <div className="mx-auto max-w-5xl px-5 pt-8 sm:px-8">
+        <ol className="grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black">
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Choose time</li>
+          <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">2 · Your details</li>
+          <li className="px-3 py-3 text-center text-[var(--text-muted)]">3 · Payment</li>
+        </ol>
+      </div>
+
+      <section className="mx-auto grid max-w-5xl gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_22rem]">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--coral)]">Server-verified quote</p>
-          <h1 className="display-type mt-3 text-5xl font-black">Review your court time.</h1>
+          <h1 className="display-type mt-3 text-5xl font-black">Confirm your booking.</h1>
           <div className="mt-8 rounded-3xl border border-[var(--line)] bg-white p-6">
             <p className="text-sm font-bold text-[var(--text-muted)]">{availability.merchant.name} · {availability.site.name}</p>
             <h2 className="mt-2 text-2xl font-black">{court.name}</h2>
@@ -89,12 +113,24 @@ export default async function CheckoutReviewPage({
         </div>
 
         <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--forest)] p-6 text-white">
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">Guest checkout</p>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">
+            {signedInUser ? "Customer checkout" : "Guest checkout"}
+          </p>
           <h2 className="mt-3 text-xl font-black">Your contact details</h2>
           <p className="mt-3 text-sm leading-6 text-white/75">
-            We&apos;ll use these details for this booking. You do not need to create an account.
+            {signedInUser
+              ? "Your booking will be linked to your Pikko customer account."
+              : "Continue as a guest or create an account to keep your bookings together."}
           </p>
-          {availability.site.manualPaymentEnabled ? (
+          {!signedInUser ? (
+            <Link
+              href={customerAuthHref}
+              className="mt-5 inline-flex w-full justify-center rounded-full border border-white/30 px-5 py-3 text-sm font-black text-white hover:bg-white/10"
+            >
+              Create customer account
+            </Link>
+          ) : null}
+          {availability.site.manualPaymentEnabled || (availability.site.onlinePaymentEnabled && mayaConfig) ? (
             <div className="mt-6">
               <CheckoutForm
                 merchantSlug={availability.merchant.slug}
@@ -104,13 +140,28 @@ export default async function CheckoutReviewPage({
                 starts={selectedSlots.map((slot) => slot.startsAt)}
                 deadlineMinutes={availability.site.manualPaymentDeadlineMinutes}
                 reserveImmediately={availability.site.manualReservationMode === "reserve_immediately"}
+                mayaEnabled={availability.site.onlinePaymentEnabled && Boolean(mayaConfig)}
+                manualEnabled={availability.site.manualPaymentEnabled}
+                customer={
+                  signedInUser
+                    ? {
+                        signedIn: true,
+                        fullName: customerProfile?.fullName ?? signedInUser.fullName,
+                        email: signedInUser.email,
+                        mobileNumber:
+                          customerProfile?.mobileNumber ??
+                          signedInUser.mobileNumber ??
+                          "",
+                      }
+                    : null
+                }
               />
             </div>
           ) : (
             <div className="mt-6 rounded-2xl bg-white/10 p-5">
-              <p className="font-black">Online checkout is not available yet.</p>
+              <p className="font-black">Payment is not available.</p>
               <p className="mt-2 text-sm leading-6 text-white/75">
-                This venue has not enabled manual payment. Maya QR Ph checkout is the next payment integration.
+                This venue has not enabled an available payment method. Contact the venue or return to availability.
               </p>
               <Link href={backHref} className="mt-5 inline-flex w-full justify-center rounded-full bg-[var(--lime)] px-5 py-3 text-sm font-black text-[var(--ink)]">
                 Return to availability

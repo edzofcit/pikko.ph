@@ -39,11 +39,11 @@ export default async function MerchantOnboardingPage({
   return (
     <DashboardShell
       eyebrow="Merchant onboarding"
-      title="Create your Pikko.ph merchant account."
-      description="This creates your venue business and assigns you as its owner. You can add your first site and courts immediately afterward."
+      title="Start your 14-day free trial."
+      description="Create your venue workspace, publish your first site and courts, and explore the complete Pikko partner system free for 14 days."
       metrics={[
         { label: "Your role", value: "Owner", note: "Full merchant access" },
-        { label: "Subscription", value: "Trial", note: "Court billing is configured later" },
+        { label: "Subscription", value: "14 days", note: "Free trial begins today" },
         { label: "Currency", value: "PHP", note: "Philippine peso" },
         { label: "Account", value: "Ready", note: access.user.email },
       ]}
@@ -101,7 +101,7 @@ export default async function MerchantOnboardingPage({
             type="submit"
             className="w-full rounded-full bg-[var(--forest)] px-5 py-3.5 text-sm font-bold text-white"
           >
-            Create merchant account
+            Start my 14-day free trial
           </button>
         </form>
 

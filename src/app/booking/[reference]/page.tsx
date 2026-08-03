@@ -1,28 +1,36 @@
-import { createHash } from "node:crypto";
-import { and, asc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
+import QRCode from "qrcode";
 import { notFound } from "next/navigation";
+import { ManualPaymentQrSelector } from "@/components/manual-payment-qr-selector";
+import { MayaPaymentPanel } from "@/components/maya-payment-panel";
 import { getDb } from "@/db";
 import {
   bookingAccessTokens,
   bookingItems,
   bookings,
   courts,
+  customers,
+  manualPaymentProofs,
   merchants,
+  payments,
   sites,
 } from "@/db/schema";
 import { formatPeso } from "@/lib/money";
+import { hashBookingAccessToken } from "@/lib/booking/access-token";
+import { syncCurrentUser } from "@/lib/auth/access";
+import {
+  isManualPaymentProvider,
+  normalizeManualPaymentOptions,
+} from "@/lib/manual-payment/options";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Booking details",
   robots: { index: false, follow: false },
 };
-
-function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 function formatDateTime(value: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-PH", {
@@ -32,83 +40,179 @@ function formatDateTime(value: Date, timezone: string) {
   }).format(value);
 }
 
+const bookingFields = {
+  id: bookings.id,
+  merchantId: bookings.merchantId,
+  customerId: bookings.customerId,
+  reference: bookings.reference,
+  status: bookings.status,
+  paymentStatus: bookings.paymentStatus,
+  customerName: bookings.customerName,
+  customerEmail: bookings.customerEmail,
+  currency: bookings.currency,
+  subtotalCents: bookings.subtotalCents,
+  totalCents: bookings.totalCents,
+  paymentDueAt: bookings.paymentDueAt,
+  createdAt: bookings.createdAt,
+  merchantName: merchants.displayName,
+  merchantSlug: merchants.slug,
+  siteName: sites.name,
+  siteSlug: sites.slug,
+  timezone: sites.timezone,
+  manualReservationMode: sites.manualReservationMode,
+  manualPaymentInstructions: sites.manualPaymentInstructions,
+  manualPaymentOptions: sites.manualPaymentOptions,
+};
+
 export default async function GuestBookingPage({
   params,
   searchParams,
 }: {
   params: Promise<{ reference: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; uploaded?: string; error?: string }>;
 }) {
   const [{ reference }, query] = await Promise.all([params, searchParams]);
   const token = query.token ?? "";
-  if (!token || token.length > 1000) notFound();
+  if (token.length > 1000) notFound();
 
   const db = getDb();
-  const [booking] = await db
-    .select({
-      id: bookings.id,
-      merchantId: bookings.merchantId,
-      reference: bookings.reference,
-      status: bookings.status,
-      paymentStatus: bookings.paymentStatus,
-      customerName: bookings.customerName,
-      customerEmail: bookings.customerEmail,
-      currency: bookings.currency,
-      subtotalCents: bookings.subtotalCents,
-      totalCents: bookings.totalCents,
-      paymentDueAt: bookings.paymentDueAt,
-      createdAt: bookings.createdAt,
-      merchantName: merchants.displayName,
-      merchantSlug: merchants.slug,
-      siteName: sites.name,
-      siteSlug: sites.slug,
-      timezone: sites.timezone,
-      manualReservationMode: sites.manualReservationMode,
-      manualPaymentInstructions: sites.manualPaymentInstructions,
-    })
-    .from(bookingAccessTokens)
-    .innerJoin(
-      bookings,
-      and(
-        eq(bookings.id, bookingAccessTokens.bookingId),
-        eq(bookings.merchantId, bookingAccessTokens.merchantId),
-      ),
-    )
-    .innerJoin(sites, eq(sites.id, bookings.siteId))
-    .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
-    .where(
-      and(
-        eq(bookings.reference, reference),
-        eq(bookingAccessTokens.tokenHash, hashToken(token)),
-        gt(bookingAccessTokens.expiresAt, new Date()),
-        isNull(bookingAccessTokens.revokedAt),
-      ),
-    )
-    .limit(1);
+  let booking: Awaited<ReturnType<typeof loadBookingWithToken>>[number] | undefined;
+
+  async function loadBookingWithToken() {
+    return db
+      .select(bookingFields)
+      .from(bookingAccessTokens)
+      .innerJoin(
+        bookings,
+        and(
+          eq(bookings.id, bookingAccessTokens.bookingId),
+          eq(bookings.merchantId, bookingAccessTokens.merchantId),
+        ),
+      )
+      .innerJoin(sites, eq(sites.id, bookings.siteId))
+      .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
+      .where(
+        and(
+          eq(bookings.reference, reference),
+          eq(bookingAccessTokens.tokenHash, hashBookingAccessToken(token)),
+          gt(bookingAccessTokens.expiresAt, new Date()),
+          isNull(bookingAccessTokens.revokedAt),
+        ),
+      )
+      .limit(1);
+  }
+
+  if (token) {
+    [booking] = await loadBookingWithToken();
+  } else {
+    const user = await syncCurrentUser();
+    if (!user) notFound();
+    const [customer] = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.userId, user.id))
+      .limit(1);
+    const ownership = customer
+      ? user.emailVerifiedAt
+        ? or(
+            eq(bookings.customerId, customer.id),
+            sql`lower(${bookings.customerEmail}) = ${user.email}`,
+          )
+        : eq(bookings.customerId, customer.id)
+      : user.emailVerifiedAt
+        ? sql`lower(${bookings.customerEmail}) = ${user.email}`
+        : null;
+    if (!ownership) notFound();
+
+    [booking] = await db
+      .select(bookingFields)
+      .from(bookings)
+      .innerJoin(sites, eq(sites.id, bookings.siteId))
+      .innerJoin(merchants, eq(merchants.id, bookings.merchantId))
+      .where(and(eq(bookings.reference, reference), ownership))
+      .limit(1);
+  }
 
   if (!booking) notFound();
 
-  const items = await db
-    .select({
-      id: bookingItems.id,
-      startsAt: bookingItems.startsAt,
-      endsAt: bookingItems.endsAt,
-      lineTotalCents: bookingItems.lineTotalCents,
-      courtName: courts.name,
-    })
-    .from(bookingItems)
-    .innerJoin(courts, eq(courts.id, bookingItems.courtId))
-    .where(
-      and(
-        eq(bookingItems.bookingId, booking.id),
-        eq(bookingItems.merchantId, booking.merchantId),
-      ),
-    )
-    .orderBy(asc(bookingItems.startsAt));
+  const [items, proofs, paymentRows] = await Promise.all([
+    db
+      .select({
+        id: bookingItems.id,
+        startsAt: bookingItems.startsAt,
+        endsAt: bookingItems.endsAt,
+        lineTotalCents: bookingItems.lineTotalCents,
+        courtName: courts.name,
+      })
+      .from(bookingItems)
+      .innerJoin(courts, eq(courts.id, bookingItems.courtId))
+      .where(
+        and(
+          eq(bookingItems.bookingId, booking.id),
+          eq(bookingItems.merchantId, booking.merchantId),
+        ),
+      )
+      .orderBy(asc(bookingItems.startsAt)),
+    db
+      .select({
+        id: manualPaymentProofs.id,
+        status: manualPaymentProofs.status,
+        originalFilename: manualPaymentProofs.originalFilename,
+        customerNotes: manualPaymentProofs.customerNotes,
+        rejectionReason: manualPaymentProofs.rejectionReason,
+        createdAt: manualPaymentProofs.createdAt,
+      })
+      .from(manualPaymentProofs)
+      .where(
+        and(
+          eq(manualPaymentProofs.bookingId, booking.id),
+          eq(manualPaymentProofs.merchantId, booking.merchantId),
+        ),
+      )
+      .orderBy(asc(manualPaymentProofs.createdAt)),
+    db
+      .select({ id: payments.id, provider: payments.provider, status: payments.status, providerPaymentId: payments.providerPaymentId, metadata: payments.metadata })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.bookingId, booking.id),
+          eq(payments.merchantId, booking.merchantId),
+        ),
+      )
+      .limit(1),
+  ]);
+  const payment = paymentRows[0];
+  const paymentMetadata = payment?.metadata;
+  const isMayaPayment = payment?.provider === "maya";
+  const isManualPayment = payment?.provider === "manual";
+  const mayaQrBody = String(paymentMetadata?.mayaQrCodeBody ?? "");
+  const mayaRedirectUrl = String(paymentMetadata?.mayaRedirectUrl ?? "");
+  const mayaQrDataUrl = isMayaPayment && mayaQrBody
+    ? await QRCode.toDataURL(mayaQrBody, { width: 900, margin: 2, errorCorrectionLevel: "M" })
+    : null;
+  const selectedProviderValue = String(
+    paymentMetadata?.manualPaymentProvider ?? "",
+  );
+  const selectedProvider = isManualPaymentProvider(selectedProviderValue)
+    ? selectedProviderValue
+    : null;
+  const paymentOptions = normalizeManualPaymentOptions([
+    ...normalizeManualPaymentOptions(booking.manualPaymentOptions),
+    {
+      provider: selectedProviderValue,
+      label: paymentMetadata?.manualPaymentLabel,
+      qrImageUrl: paymentMetadata?.manualPaymentQrUrl,
+      qrImagePathname: paymentMetadata?.manualPaymentQrPathname,
+    },
+  ]);
 
   const deadlinePassed =
     booking.paymentDueAt !== null && booking.paymentDueAt <= new Date();
   const publicSiteHref = `/${booking.merchantSlug}/${booking.siteSlug}`;
+  const acceptsProofs =
+    isManualPayment &&
+    ["pending_payment", "pending_verification"].includes(booking.status) &&
+    booking.paymentStatus !== "paid";
 
   return (
     <main className="min-h-screen">
@@ -122,12 +226,17 @@ export default async function GuestBookingPage({
       </header>
 
       <section className="mx-auto max-w-4xl px-5 py-12 sm:px-8">
+        <ol className="mb-7 grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--line)] bg-white text-xs font-black">
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Choose time</li>
+          <li className="px-3 py-3 text-center text-[var(--forest)]">✓ Your details</li>
+          <li className="bg-[var(--forest)] px-3 py-3 text-center text-white">3 · Payment</li>
+        </ol>
         <div className="rounded-3xl bg-[var(--forest)] p-7 text-white sm:p-9">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lime)]">
             Booking received
           </p>
           <h1 className="display-type mt-3 text-4xl font-black sm:text-5xl">
-            Complete your manual payment.
+            {isMayaPayment ? "Complete your Maya payment." : "Complete your manual payment."}
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/75">
             Hi {booking.customerName}. Your booking request with {booking.merchantName} has been recorded. Keep this private link so you can return to the details.
@@ -136,7 +245,7 @@ export default async function GuestBookingPage({
 
         <div className="mt-7 grid gap-7 lg:grid-cols-[1fr_21rem]">
           <div className="space-y-7">
-            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            {isMayaPayment ? <section className="rounded-3xl border border-[var(--line)] bg-white p-6"><p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">Secure online payment</p><h2 className="mt-2 text-2xl font-black">Scan to pay with Maya QRPh</h2><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Pikko confirms the booking only after the payment result is verified directly with Maya.</p>{payment && mayaQrDataUrl && mayaRedirectUrl ? <div className="mt-6"><MayaPaymentPanel paymentId={payment.id} accessToken={token} qrDataUrl={mayaQrDataUrl} mayaUrl={mayaRedirectUrl} initiallyPaid={payment.status === "paid"} /></div> : <p className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">The Maya QR details are unavailable. Return to the venue and start a new booking.</p>}</section> : <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-[var(--text-muted)]">
@@ -167,18 +276,117 @@ export default async function GuestBookingPage({
                 <span className="font-black">Total due</span>
                 <span className="text-2xl font-black">{formatPeso(booking.totalCents)}</span>
               </div>
-            </section>
+            </section>}
 
-            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            {isManualPayment ? <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
                 Payment instructions
               </p>
               <h2 className="mt-2 text-2xl font-black">Pay the venue directly</h2>
+              {paymentOptions.length ? (
+                <div className="mt-5">
+                  <ManualPaymentQrSelector
+                    options={paymentOptions}
+                    initialProvider={selectedProvider}
+                  />
+                </div>
+              ) : null}
               <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--text-muted)]">
                 {booking.manualPaymentInstructions ||
                   "Contact the venue using your booking reference for its current payment instructions."}
               </p>
-            </section>
+              <div className="mt-7 border-t border-[var(--line)] pt-7">
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
+                Payment proof
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Upload your payment screenshot</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                The merchant will review your screenshot before confirming the booking.
+              </p>
+
+              {query.uploaded === "1" ? (
+                <p className="mt-4 rounded-2xl bg-[var(--mint)] p-4 text-sm font-bold text-[var(--forest)]">
+                  Screenshot uploaded. Your booking is now awaiting merchant verification.
+                </p>
+              ) : null}
+              {query.error ? (
+                <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">
+                  {query.error}
+                </p>
+              ) : null}
+
+              {acceptsProofs ? (
+                <form
+                  action={`/api/bookings/${encodeURIComponent(booking.reference)}/payment-proof`}
+                  method="post"
+                  encType="multipart/form-data"
+                  className="mt-5 space-y-4"
+                >
+                  <input type="hidden" name="token" value={token} />
+                  <label className="block text-sm font-bold">
+                    Screenshot
+                    <input
+                      type="file"
+                      name="screenshot"
+                      accept="image/jpeg,image/png,image/webp"
+                      required
+                      className="mt-2 block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-[var(--forest)] file:px-4 file:py-2 file:font-bold file:text-white"
+                    />
+                  </label>
+                  <p className="text-xs text-[var(--text-muted)]">JPG, PNG, or WebP · maximum 3 MB</p>
+                  <label className="block text-sm font-bold">
+                    Notes for the merchant (optional)
+                    <textarea
+                      name="notes"
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Example: Paid from account ending in 1234"
+                      className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 font-normal outline-none focus:border-[var(--forest)]"
+                    />
+                  </label>
+                  <button className="rounded-full bg-[var(--forest)] px-5 py-3 text-sm font-black text-white">
+                    Submit payment proof
+                  </button>
+                </form>
+              ) : (
+                <p className="mt-5 rounded-2xl bg-[var(--paper)] p-4 text-sm text-[var(--text-muted)]">
+                  This booking is no longer accepting payment screenshots.
+                </p>
+              )}
+
+              {proofs.length ? (
+                <div className="mt-7 space-y-4 border-t border-[var(--line)] pt-5">
+                  <h3 className="font-black">Submitted screenshots</h3>
+                  {proofs.map((proof) => (
+                    <article key={proof.id} className="overflow-hidden rounded-2xl border border-[var(--line)]">
+                      <Image
+                        src={`/api/payment-proofs/${proof.id}${token ? `?token=${encodeURIComponent(token)}` : ""}`}
+                        alt={`Payment proof ${proof.originalFilename}`}
+                        width={1200}
+                        height={800}
+                        unoptimized
+                        className="h-48 w-full bg-[var(--paper)] object-contain"
+                      />
+                      <div className="p-4 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="truncate font-bold">{proof.originalFilename}</span>
+                          <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-xs font-black uppercase">
+                            {proof.status}
+                          </span>
+                        </div>
+                        {proof.customerNotes ? <p className="mt-2 text-[var(--text-muted)]">{proof.customerNotes}</p> : null}
+                        {proof.rejectionReason ? (
+                          <p className="mt-3 rounded-xl bg-red-50 p-3 font-bold text-red-800">
+                            Merchant response: {proof.rejectionReason}
+                          </p>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+              </div>
+            </section> : null}
           </div>
 
           <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-6">
@@ -204,7 +412,9 @@ export default async function GuestBookingPage({
               </div>
             </dl>
             <p className="mt-5 rounded-2xl bg-[var(--cream)] p-4 text-xs leading-5 text-[var(--text-muted)]">
-              {booking.manualReservationMode === "reserve_immediately"
+              {isMayaPayment
+                ? "The selected slots are temporarily held while the Maya QR is active. The booking confirms automatically after successful payment."
+                : booking.manualReservationMode === "reserve_immediately"
                 ? "The court is reserved until the payment deadline. The merchant will confirm it after verifying payment."
                 : "The court is not guaranteed until the merchant verifies payment."}
             </p>

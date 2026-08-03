@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   index,
@@ -34,6 +35,10 @@ export const merchantSubscriptions = pgTable(
     ...timestamps(),
   },
   (table) => [
+    uniqueIndex("merchant_subscriptions_merchant_period_uidx").on(
+      table.merchantId,
+      table.currentPeriodStart,
+    ),
     index("merchant_subscriptions_merchant_status_idx").on(
       table.merchantId,
       table.status,
@@ -45,6 +50,42 @@ export const merchantSubscriptions = pgTable(
     check(
       "merchant_subscriptions_valid_period",
       sql`${table.currentPeriodStart} < ${table.currentPeriodEnd}`,
+    ),
+  ],
+);
+
+export const platformSettings = pgTable(
+  "platform_settings",
+  {
+    key: varchar("key", { length: 64 }).primaryKey().default("default"),
+    defaultMonthlyCourtPriceCents: integer("default_monthly_court_price_cents")
+      .default(59900)
+      .notNull(),
+    defaultGatewayFeeBasisPoints: integer("default_gateway_fee_basis_points")
+      .default(0)
+      .notNull(),
+    mayaEnabled: boolean("maya_enabled").default(false).notNull(),
+    mayaEnvironment: varchar("maya_environment", { length: 16 })
+      .default("sandbox")
+      .notNull(),
+    mayaPublicKeyEncrypted: text("maya_public_key_encrypted"),
+    mayaSecretKeyEncrypted: text("maya_secret_key_encrypted"),
+    mayaPublicKeyLastFour: varchar("maya_public_key_last_four", { length: 4 }),
+    mayaSecretKeyLastFour: varchar("maya_secret_key_last_four", { length: 4 }),
+    ...timestamps(),
+  },
+  (table) => [
+    check(
+      "platform_settings_monthly_price_nonnegative",
+      sql`${table.defaultMonthlyCourtPriceCents} >= 0`,
+    ),
+    check(
+      "platform_settings_gateway_fee_range",
+      sql`${table.defaultGatewayFeeBasisPoints} between 0 and 10000`,
+    ),
+    check(
+      "platform_settings_maya_environment_valid",
+      sql`${table.mayaEnvironment} in ('sandbox', 'production')`,
     ),
   ],
 );
@@ -105,6 +146,10 @@ export const subscriptionInvoices = pgTable(
   },
   (table) => [
     uniqueIndex("subscription_invoices_number_uidx").on(table.invoiceNumber),
+    uniqueIndex("subscription_invoices_merchant_period_uidx").on(
+      table.merchantId,
+      table.periodStart,
+    ),
     index("subscription_invoices_merchant_status_idx").on(
       table.merchantId,
       table.status,

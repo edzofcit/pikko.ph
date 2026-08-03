@@ -1,7 +1,25 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    localPatterns: [
+      {
+        pathname: "/api/sites/*/payment-qr/*",
+      },
+      {
+        pathname: "/api/venue-photos/*/*",
+      },
+      {
+        pathname: "/api/merchant-media/*/*",
+      },
+    ],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
