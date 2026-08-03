@@ -178,7 +178,17 @@ export async function POST(
   }
 
   if (!booking) {
-    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    console.warn("Payment proof booking lookup failed", {
+      tokenProvided: Boolean(token),
+      referenceSuffix: reference.slice(-4),
+    });
+    return redirectWithMessage(
+      request,
+      reference,
+      token,
+      "error",
+      "This booking is not configured for manual payment proof uploads.",
+    );
   }
   if (
     booking.paymentProvider !== "manual" ||
@@ -217,6 +227,11 @@ export async function POST(
         .set({ status: "pending", failedAt: null, failureCode: null, failureMessage: null, updatedAt: now })
         .where(eq(payments.id, booking.paymentId)),
     ]);
+    console.info("Payment proof uploaded", {
+      bookingId: booking.id,
+      paymentId: booking.paymentId,
+      storageProvider: uploadedKey.startsWith("cloudinary:") ? "cloudinary" : "blob",
+    });
   } catch (error) {
     if (uploadedKey) {
       await deleteStoredImage(uploadedKey).catch((cleanupError) =>

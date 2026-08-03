@@ -184,6 +184,7 @@ export default async function GuestBookingPage({
   const payment = paymentRows[0];
   const paymentMetadata = payment?.metadata;
   const isMayaPayment = payment?.provider === "maya";
+  const isManualPayment = payment?.provider === "manual";
   const mayaQrBody = String(paymentMetadata?.mayaQrCodeBody ?? "");
   const mayaRedirectUrl = String(paymentMetadata?.mayaRedirectUrl ?? "");
   const mayaQrDataUrl = isMayaPayment && mayaQrBody
@@ -209,6 +210,7 @@ export default async function GuestBookingPage({
     booking.paymentDueAt !== null && booking.paymentDueAt <= new Date();
   const publicSiteHref = `/${booking.merchantSlug}/${booking.siteSlug}`;
   const acceptsProofs =
+    isManualPayment &&
     ["pending_payment", "pending_verification"].includes(booking.status) &&
     booking.paymentStatus !== "paid";
 
@@ -276,7 +278,7 @@ export default async function GuestBookingPage({
               </div>
             </section>}
 
-            <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            {isManualPayment ? <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--coral)]">
                 Payment instructions
               </p>
@@ -384,7 +386,7 @@ export default async function GuestBookingPage({
                 </div>
               ) : null}
               </div>
-            </section>
+            </section> : null}
           </div>
 
           <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-6">

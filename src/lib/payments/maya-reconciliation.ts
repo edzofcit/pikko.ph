@@ -40,16 +40,26 @@ export async function reconcileMayaPayment(providerPaymentId: string) {
   const totalAmount = provider.totalAmount as Record<string, unknown> | undefined;
   const providerAmountCents = Math.round(Number(totalAmount?.value ?? Number.NaN) * 100);
   const providerCurrency = stringValue(totalAmount?.currency || "PHP").toUpperCase();
+  const outcome = mayaOutcome(provider);
 
-  if (
+  if (outcome !== "pending" && (
     providerRequestReference !== payment.requestReference ||
     providerAmountCents !== payment.amountCents ||
     providerCurrency !== payment.currency
-  ) {
+  )) {
+    console.error("Maya reconciliation mismatch", {
+      paymentId: payment.id,
+      providerPaymentId,
+      outcome,
+      referenceMatches: providerRequestReference === payment.requestReference,
+      amountMatches: providerAmountCents === payment.amountCents,
+      currencyMatches: providerCurrency === payment.currency,
+      providerReferencePresent: Boolean(providerRequestReference),
+      providerAmountValid: Number.isFinite(providerAmountCents),
+    });
     throw new Error("Maya payment reconciliation values do not match the booking.");
   }
 
-  const outcome = mayaOutcome(provider);
   const now = new Date();
   const payloadHash = createHash("sha256").update(JSON.stringify(provider)).digest("hex");
   const providerStatus = stringValue(provider.paymentStatus || provider.status) || "UNKNOWN";

@@ -51,7 +51,8 @@ export function CheckoutForm({
       <input type="hidden" name="starts" value={starts.join(",")} />
 
       <fieldset>
-        <legend className="text-sm font-black">Payment method</legend>
+        <legend className="text-sm font-black">Choose how you want to pay</legend>
+        <p className="mt-2 text-xs leading-5 text-white/65">You will only see the payment screen and instructions for the option selected here.</p>
         <div className="mt-3 grid gap-3">
           {mayaEnabled ? <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${paymentMethod === "maya" ? "border-[var(--lime)] bg-white/15" : "border-white/20 bg-white/5"}`}><input name="paymentMethod" type="radio" value="maya" checked={paymentMethod === "maya"} onChange={() => setPaymentMethod("maya")} className="mt-1" /><span><strong className="block text-white">Maya QR online payment</strong><span className="mt-1 block text-xs leading-5 text-white/65">Scan a dynamic QRPh code. Your booking confirms automatically after payment.</span></span></label> : null}
           {manualEnabled ? <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${paymentMethod === "manual" ? "border-[var(--lime)] bg-white/15" : "border-white/20 bg-white/5"}`}><input name="paymentMethod" type="radio" value="manual" checked={paymentMethod === "manual"} onChange={() => setPaymentMethod("manual")} className="mt-1" /><span><strong className="block text-white">Manual payment</strong><span className="mt-1 block text-xs leading-5 text-white/65">Follow the venue&apos;s payment instructions and upload a screenshot.</span></span></label> : null}
