@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getDb } from "@/db";
 import { merchantMemberships, merchants } from "@/db/schema";
 import { syncCurrentUser } from "@/lib/auth/access";
+import { sendMerchantTrialStartedEmails } from "@/lib/email/merchant-trial";
 import { toPublicMerchantSlug } from "@/lib/slug";
 
 function onboardingUrl(error: "invalid" | "membership-exists") {
@@ -58,6 +60,7 @@ export async function createMerchantAccount(formData: FormData) {
     ? `${baseSlug}-${merchantId.slice(0, 8)}`
     : baseSlug;
   const now = new Date();
+  const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1_000);
 
   await db.batch([
     db.insert(merchants).values({
@@ -69,6 +72,7 @@ export async function createMerchantAccount(formData: FormData) {
       contactEmail: user.email,
       contactPhone: contactPhone || null,
       subscriptionStatus: "trialing",
+      trialEndsAt,
     }),
     db.insert(merchantMemberships).values({
       id: membershipId,
@@ -81,6 +85,23 @@ export async function createMerchantAccount(formData: FormData) {
     }),
   ]);
 
+  after(async () => {
+    try {
+      await sendMerchantTrialStartedEmails({
+        merchantId,
+        merchantName: displayName,
+        merchantSlug: slug,
+        ownerName: user.fullName,
+        ownerEmail: user.email,
+        contactPhone: contactPhone || null,
+        trialEndsAt,
+      });
+    } catch (error) {
+      console.error(`Merchant trial email failed for ${merchantId}`, error);
+    }
+  });
+
   revalidatePath("/merchant");
-  redirect("/merchant/sites?success=Merchant+account+created.+Add+your+first+site.");
+  revalidatePath("/admin/merchants");
+  redirect("/merchant/sites?success=Your+14-day+free+trial+is+active.+Add+your+first+site.");
 }

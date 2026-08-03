@@ -267,8 +267,11 @@ export default async function LandingPreviewPage({
 
       <section className="relative mx-auto mb-8 w-[calc(100%_-_2.5rem)] max-w-[87.5rem] overflow-hidden rounded-[2.5rem] bg-[var(--lime)] px-6 py-14 sm:px-10 lg:flex lg:items-center lg:justify-between lg:px-16 lg:py-16">
         <div className="noise absolute inset-0 opacity-40" />
-        <div className="relative"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--forest)]/65">For venue partners</p><h2 className="display-type mt-4 max-w-3xl text-5xl font-black sm:text-6xl">More court time.<br />Less admin time.</h2><p className="mt-5 max-w-xl text-sm leading-6 text-[var(--forest)]/75">Publish live schedules, manage multiple sites, verify payments, and understand utilization from one dashboard.</p></div>
-        <Link href={session?.user ? "/merchant" : "/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant"} className="relative mt-8 inline-flex min-h-13 items-center gap-2 rounded-full bg-[var(--ink)] px-7 text-sm font-black text-white transition hover:-translate-y-0.5 lg:mt-0 motion-reduce:transform-none">Open Partner Dashboard <LandingIcon name="arrow" /></Link>
+        <div className="relative"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--forest)]/65">For venue partners · 14 days free</p><h2 className="display-type mt-4 max-w-3xl text-5xl font-black sm:text-6xl">Try the complete system.<br />Free for 14 days.</h2><p className="mt-5 max-w-xl text-sm leading-6 text-[var(--forest)]/75">Publish live schedules, manage multiple sites, verify payments, and understand utilization. Set up your workspace now and explore every core booking tool during your trial.</p></div>
+        <div className="relative mt-8 flex flex-wrap gap-3 lg:mt-0 lg:max-w-sm lg:justify-end">
+          <Link href={session?.user ? "/merchant/onboarding" : "/auth/sign-up?audience=merchant&callbackURL=%2Fmerchant%2Fonboarding"} className="inline-flex min-h-13 items-center gap-2 rounded-full bg-[var(--ink)] px-7 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[var(--forest)] motion-reduce:transform-none">Start 14-day free trial <LandingIcon name="arrow" /></Link>
+          <Link href="/auth/sign-in?audience=merchant&callbackURL=%2Fmerchant" className="inline-flex min-h-13 items-center rounded-full border border-[var(--forest)]/25 bg-white/40 px-6 text-sm font-black text-[var(--forest)] transition hover:-translate-y-0.5 hover:bg-white motion-reduce:transform-none">Partner login</Link>
+        </div>
       </section>
 
       <footer className="mx-auto flex w-full max-w-[90rem] flex-col gap-4 px-5 py-9 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">

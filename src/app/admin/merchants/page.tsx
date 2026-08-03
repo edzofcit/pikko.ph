@@ -63,6 +63,9 @@ export default async function AdminMerchantsPage({
     courtCount: courtCounts.get(merchant.id) ?? 0,
     bookingCount: bookingCounts.get(merchant.id) ?? 0,
   }));
+  const trialRows = merchantRows.filter(
+    (merchant) => merchant.subscriptionStatus === "trialing",
+  );
   const defaults = defaultRows[0];
 
   return (
@@ -97,7 +100,39 @@ export default async function AdminMerchantsPage({
         </form>
       </section>
 
-      <section className="mt-6 space-y-4">
+      <section className="mt-6 overflow-hidden rounded-2xl border border-[var(--forest)]/15 bg-[var(--forest)] text-white shadow-[0_18px_55px_rgb(23_60_42_/_12%)]">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 px-5 py-6 sm:px-6">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.15em] text-[var(--lime)]">Trial pipeline</p>
+            <h2 className="mt-2 text-2xl font-black">Currently on a 14-day trial</h2>
+            <p className="mt-2 text-sm text-white/65">Prioritize onboarding and review activity before each trial expires.</p>
+          </div>
+          <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-black">{trialRows.length} active</span>
+        </div>
+        {trialRows.length ? (
+          <div className="divide-y divide-white/10">
+            {trialRows.map((merchant) => (
+              <article key={merchant.id} className="grid gap-4 px-5 py-5 transition hover:bg-white/5 sm:px-6 lg:grid-cols-[1.3fr_0.8fr_0.8fr_auto] lg:items-center">
+                <div>
+                  <h3 className="font-black">{merchant.displayName}</h3>
+                  <p className="mt-1 text-xs text-white/60">{merchant.contactEmail ?? `/${merchant.slug}`}</p>
+                </div>
+                <div><p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/45">Time remaining</p><p className="mt-1 text-sm font-black text-[var(--lime)]">{trialNote(merchant.subscriptionStatus, merchant.trialEndsAt)}</p></div>
+                <div><p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/45">Setup activity</p><p className="mt-1 text-sm font-bold">{merchant.siteCount} sites · {merchant.courtCount} courts · {merchant.bookingCount} bookings</p></div>
+                <Link href={`/admin/merchants/${merchant.id}`} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--lime)] px-5 text-xs font-black text-[var(--forest)] transition hover:-translate-y-0.5 hover:bg-white motion-reduce:transform-none">Review trial</Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="px-6 py-10 text-center text-sm text-white/60">No merchants are currently in the trial period.</p>
+        )}
+      </section>
+
+      <section className="mt-8 space-y-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--coral)]">Merchant directory</p>
+          <h2 className="mt-2 text-2xl font-black">All merchant accounts</h2>
+        </div>
         {merchantRows.map((merchant) => (
           <article key={merchant.id} className="rounded-2xl border border-[var(--line)] bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
