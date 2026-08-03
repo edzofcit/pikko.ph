@@ -63,7 +63,13 @@ export type CourtAvailability = {
 };
 
 export type SiteAvailability = {
-  merchant: { id: string; name: string; slug: string; gatewayFeeBasisPoints: number };
+  merchant: {
+    id: string;
+    name: string;
+    slug: string;
+    contactEmail: string | null;
+    gatewayFeeBasisPoints: number;
+  };
   site: {
     id: string;
     name: string;
@@ -75,6 +81,7 @@ export type SiteAvailability = {
     latitude: string | null;
     longitude: string | null;
     timezone: string;
+    contactEmail: string | null;
     amenities: string[];
     bookingLeadMinutes: number;
     advanceBookingDays: number;
@@ -256,6 +263,7 @@ export async function getSiteAvailability(
       merchantId: merchants.id,
       merchantName: merchants.displayName,
       merchantSlug: merchants.slug,
+      merchantContactEmail: merchants.contactEmail,
       gatewayFeeBasisPoints: merchants.gatewayFeeBasisPoints,
       siteId: sites.id,
       siteName: sites.name,
@@ -267,6 +275,7 @@ export async function getSiteAvailability(
       latitude: sites.latitude,
       longitude: sites.longitude,
       timezone: sites.timezone,
+      siteContactEmail: sites.contactEmail,
       amenities: sites.amenities,
       bookingLeadMinutes: sites.bookingLeadMinutes,
       advanceBookingDays: sites.advanceBookingDays,
@@ -330,7 +339,13 @@ export async function getSiteAvailability(
 
   if (courtRows.length === 0) {
     return {
-      merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug, gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints },
+      merchant: {
+        id: venue.merchantId,
+        name: venue.merchantName,
+        slug: venue.merchantSlug,
+        contactEmail: venue.merchantContactEmail,
+        gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints,
+      },
       site: {
         id: venue.siteId,
         name: venue.siteName,
@@ -342,6 +357,7 @@ export async function getSiteAvailability(
         latitude: venue.latitude,
         longitude: venue.longitude,
         timezone: venue.timezone,
+        contactEmail: venue.siteContactEmail,
         amenities: venue.amenities,
         bookingLeadMinutes: venue.bookingLeadMinutes,
         advanceBookingDays: venue.advanceBookingDays,
@@ -554,7 +570,13 @@ export async function getSiteAvailability(
   });
 
   return {
-    merchant: { id: venue.merchantId, name: venue.merchantName, slug: venue.merchantSlug, gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints },
+    merchant: {
+      id: venue.merchantId,
+      name: venue.merchantName,
+      slug: venue.merchantSlug,
+      contactEmail: venue.merchantContactEmail,
+      gatewayFeeBasisPoints: venue.gatewayFeeBasisPoints,
+    },
     site: {
       id: venue.siteId,
       name: venue.siteName,
@@ -566,6 +588,7 @@ export async function getSiteAvailability(
       latitude: venue.latitude,
       longitude: venue.longitude,
       timezone: venue.timezone,
+      contactEmail: venue.siteContactEmail,
       amenities: venue.amenities,
       bookingLeadMinutes: venue.bookingLeadMinutes,
       advanceBookingDays: venue.advanceBookingDays,

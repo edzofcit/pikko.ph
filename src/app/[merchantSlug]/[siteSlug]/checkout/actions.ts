@@ -16,7 +16,7 @@ import {
 import { getSiteAvailability } from "@/lib/booking/availability";
 import { syncCurrentUser } from "@/lib/auth/access";
 import { ensureCustomerProfile } from "@/lib/customer/profile";
-import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { sendBookingCreatedEmails } from "@/lib/email/booking-confirmation";
 import { createMayaDynamicQr, getMayaConfig } from "@/lib/payments/maya";
 import { encryptPlatformSecret } from "@/lib/security/encrypted-secret";
 
@@ -313,9 +313,9 @@ export async function createBooking(
 
   const requestHeaders = await headers();
   const bookingPath = `/booking/${reference}?token=${encodeURIComponent(accessToken)}`;
-  const bookingUrl = new URL(bookingPath, bookingOrigin(requestHeaders)).toString();
+  const origin = bookingOrigin(requestHeaders);
+  const bookingUrl = new URL(bookingPath, origin).toString();
   if (paymentMethod === "maya" && mayaConfig && mayaReturnToken) {
-    const origin = bookingOrigin(requestHeaders);
     const returnBase = new URL("/payments/maya/return", origin);
     returnBase.searchParams.set("payment", paymentId);
     returnBase.searchParams.set("returnToken", mayaReturnToken);
@@ -357,11 +357,14 @@ export async function createBooking(
   if (process.env.BOOKING_EMAIL_ENABLED === "true") {
     after(async () => {
       try {
-        await sendBookingConfirmationEmail({
+        await sendBookingCreatedEmails({
           bookingId,
           bookingUrl,
+          merchantBookingUrl: new URL(`/merchant/bookings/${bookingId}`, origin).toString(),
           customerEmail: email,
           customerName: fullName,
+          customerMobileNumber: mobileNumber,
+          merchantEmail: availability.site.contactEmail ?? availability.merchant.contactEmail,
           reference,
           merchantName: availability.merchant.name,
           siteName: availability.site.name,
@@ -372,11 +375,12 @@ export async function createBooking(
             endsAt: item.endsAt,
           })),
           totalCents: subtotalCents,
+          paymentMethod,
           paymentDueAt,
           manualPaymentInstructions: paymentMethod === "manual" ? availability.site.manualPaymentInstructions : null,
         });
       } catch (error) {
-        console.error(`Booking confirmation email failed for ${reference}`, error);
+        console.error(`Booking notification emails failed for ${reference}`, error);
       }
     });
   }

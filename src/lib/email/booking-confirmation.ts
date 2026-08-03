@@ -9,11 +9,14 @@ type BookingEmailSlot = {
   endsAt: Date;
 };
 
-type BookingConfirmationEmail = {
+export type BookingCreatedEmail = {
   bookingId: string;
   bookingUrl: string;
+  merchantBookingUrl: string;
   customerEmail: string;
   customerName: string;
+  customerMobileNumber: string;
+  merchantEmail: string | null;
   reference: string;
   merchantName: string;
   siteName: string;
@@ -21,8 +24,17 @@ type BookingConfirmationEmail = {
   timezone: string;
   slots: BookingEmailSlot[];
   totalCents: number;
+  paymentMethod: "manual" | "maya";
   paymentDueAt: Date;
   manualPaymentInstructions: string | null;
+};
+
+type Message = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  idempotencyKey: string;
 };
 
 function escapeHtml(value: string) {
@@ -45,89 +57,212 @@ function formatDateTime(value: Date, timezone: string) {
 function scheduleLines(slots: BookingEmailSlot[], timezone: string) {
   return slots.map(
     (slot) =>
-      `${formatDateTime(slot.startsAt, timezone)}–${new Intl.DateTimeFormat("en-PH", {
+      `${formatDateTime(slot.startsAt, timezone)} – ${new Intl.DateTimeFormat("en-PH", {
         timeZone: timezone,
         timeStyle: "short",
       }).format(slot.endsAt)}`,
   );
 }
 
-export async function sendBookingConfirmationEmail(
-  booking: BookingConfirmationEmail,
-) {
+function shell({
+  preheader,
+  eyebrow,
+  heading,
+  intro,
+  content,
+}: {
+  preheader: string;
+  eyebrow: string;
+  heading: string;
+  intro: string;
+  content: string;
+}) {
+  return `<!doctype html>
+<html lang="en">
+  <body style="margin:0;background:#f5f2e8;color:#153d31;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
+    <div style="max-width:620px;margin:0 auto;padding:28px 14px 40px;">
+      <div style="padding:0 8px 18px;font-size:18px;font-weight:900;letter-spacing:-0.4px;">pikko<span style="color:#ff7358;">.ph</span></div>
+      <div style="overflow:hidden;border-radius:26px;background:#153d31;color:#ffffff;box-shadow:0 16px 40px rgba(21,61,49,.14);">
+        <div style="height:7px;background:#efff28;"></div>
+        <div style="padding:32px 28px;">
+          <div style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#efff28;">${escapeHtml(eyebrow)}</div>
+          <h1 style="margin:12px 0 0;font-size:34px;line-height:1.12;letter-spacing:-1px;">${escapeHtml(heading)}</h1>
+          <p style="margin:15px 0 0;color:#d5e2dc;font-size:16px;line-height:1.6;">${escapeHtml(intro)}</p>
+        </div>
+      </div>
+      ${content}
+      <p style="margin:20px 0 0;text-align:center;font-size:12px;line-height:1.6;color:#718078;">Pikko.ph · Find your court. Pick your hour. Play.</p>
+    </div>
+  </body>
+</html>`;
+}
+
+function detailRow(label: string, value: string) {
+  return `<div style="padding:13px 0;border-bottom:1px solid #e7e8df;">
+    <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#78847e;">${escapeHtml(label)}</div>
+    <div style="margin-top:5px;font-size:15px;font-weight:750;line-height:1.5;color:#153d31;">${escapeHtml(value)}</div>
+  </div>`;
+}
+
+function actionButton(label: string, url: string) {
+  return `<a href="${escapeHtml(url)}" style="display:block;margin-top:24px;padding:16px 22px;border-radius:999px;background:#efff28;color:#153d31;text-decoration:none;text-align:center;font-size:15px;font-weight:900;">${escapeHtml(label)} &rarr;</a>`;
+}
+
+function customerMessage(booking: BookingCreatedEmail, schedules: string[]): Message {
+  const paymentLabel = booking.paymentMethod === "maya" ? "Maya QR payment" : "Manual payment";
+  const instructions = booking.manualPaymentInstructions?.trim();
+  const text = [
+    `Hi ${booking.customerName},`,
+    "",
+    `We received your booking request for ${booking.siteName}.`,
+    `Reference: ${booking.reference}`,
+    `Court: ${booking.courtName}`,
+    ...schedules.map((schedule) => `Schedule: ${schedule}`),
+    `Total: ${formatPeso(booking.totalCents)}`,
+    `Payment: ${paymentLabel}`,
+    `Complete payment by: ${formatDateTime(booking.paymentDueAt, booking.timezone)}`,
+    instructions ? `Payment instructions: ${instructions}` : "",
+    "",
+    "Open your private booking page to complete payment, upload proof, or check the latest status:",
+    booking.bookingUrl,
+    "",
+    "Keep this private link secure. Anyone with it can view this booking.",
+  ].filter(Boolean).join("\n");
+
+  const scheduleRows = schedules.map((schedule) => detailRow("Schedule", schedule)).join("");
+  const instructionCard = instructions
+    ? `<div style="margin-top:18px;padding:17px;border-radius:16px;background:#f5f2e8;color:#354b42;white-space:pre-wrap;font-size:14px;line-height:1.65;"><strong style="color:#153d31;">Payment instructions</strong><br>${escapeHtml(instructions)}</div>`
+    : "";
+  const html = shell({
+    preheader: `Booking ${booking.reference} received. Return to your booking anytime with this private link.`,
+    eyebrow: "Booking received",
+    heading: "Your court is one step away.",
+    intro: `Hi ${booking.customerName}, we saved your booking request with ${booking.merchantName}. Complete payment before the deadline to secure your court.`,
+    content: `<div style="margin-top:16px;padding:26px;border:1px solid #dfe3db;border-radius:22px;background:#ffffff;box-shadow:0 10px 30px rgba(21,61,49,.06);">
+      <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:#fff4d6;color:#74521b;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;">Awaiting payment</div>
+      ${detailRow("Booking reference", booking.reference)}
+      ${detailRow("Venue", `${booking.merchantName} · ${booking.siteName}`)}
+      ${detailRow("Court", booking.courtName)}
+      ${scheduleRows}
+      ${detailRow("Payment option", paymentLabel)}
+      ${detailRow("Payment deadline", formatDateTime(booking.paymentDueAt, booking.timezone))}
+      <div style="padding-top:18px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#78847e;">Total due</div>
+        <div style="margin-top:5px;font-size:30px;font-weight:900;letter-spacing:-1px;">${escapeHtml(formatPeso(booking.totalCents))}</div>
+      </div>
+      ${instructionCard}
+      ${actionButton("Open my booking", booking.bookingUrl)}
+      <p style="margin:14px 4px 0;font-size:12px;line-height:1.55;color:#78847e;">This button contains your private booking link. Please do not forward this email.</p>
+    </div>`,
+  });
+
+  return {
+    to: booking.customerEmail,
+    subject: `Booking received · ${booking.reference} · ${booking.siteName}`,
+    text,
+    html,
+    idempotencyKey: `booking-created-customer-${booking.bookingId}`,
+  };
+}
+
+function merchantMessage(booking: BookingCreatedEmail, schedules: string[]): Message | null {
+  if (!booking.merchantEmail) return null;
+  const paymentLabel = booking.paymentMethod === "maya" ? "Maya QR" : "Manual payment";
+  const text = [
+    `A new booking was created at ${booking.siteName}.`,
+    "",
+    `Reference: ${booking.reference}`,
+    `Customer: ${booking.customerName}`,
+    `Email: ${booking.customerEmail}`,
+    `Mobile: ${booking.customerMobileNumber}`,
+    `Court: ${booking.courtName}`,
+    ...schedules.map((schedule) => `Schedule: ${schedule}`),
+    `Total: ${formatPeso(booking.totalCents)}`,
+    `Payment: ${paymentLabel} — pending`,
+    "",
+    "Open the booking in your Partner Dashboard:",
+    booking.merchantBookingUrl,
+  ].join("\n");
+
+  const html = shell({
+    preheader: `New booking ${booking.reference} at ${booking.siteName}.`,
+    eyebrow: "New booking",
+    heading: "A player just chose your court.",
+    intro: `${booking.customerName} created a booking at ${booking.siteName}. Payment is still pending.`,
+    content: `<div style="margin-top:16px;padding:26px;border:1px solid #dfe3db;border-radius:22px;background:#ffffff;box-shadow:0 10px 30px rgba(21,61,49,.06);">
+      <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:#eaf7ee;color:#21613f;font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;">New request</div>
+      ${detailRow("Booking reference", booking.reference)}
+      ${detailRow("Customer", booking.customerName)}
+      ${detailRow("Contact", `${booking.customerEmail} · ${booking.customerMobileNumber}`)}
+      ${detailRow("Venue", booking.siteName)}
+      ${detailRow("Court", booking.courtName)}
+      ${schedules.map((schedule) => detailRow("Schedule", schedule)).join("")}
+      ${detailRow("Payment", `${paymentLabel} · Pending`)}
+      <div style="padding-top:18px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#78847e;">Booking value</div>
+        <div style="margin-top:5px;font-size:30px;font-weight:900;letter-spacing:-1px;">${escapeHtml(formatPeso(booking.totalCents))}</div>
+      </div>
+      ${actionButton("Review in Partner Dashboard", booking.merchantBookingUrl)}
+    </div>`,
+  });
+
+  return {
+    to: booking.merchantEmail,
+    subject: `New booking · ${booking.reference} · ${booking.siteName}`,
+    text,
+    html,
+    idempotencyKey: `booking-created-merchant-${booking.bookingId}`,
+  };
+}
+
+async function sendMessage(resend: Resend, from: string, message: Message) {
+  const { data, error } = await resend.emails.send(
+    {
+      from,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    },
+    { idempotencyKey: message.idempotencyKey },
+  );
+  if (error) throw new Error(`Resend rejected email to ${message.to}: ${error.message}`);
+  return data?.id ?? null;
+}
+
+export async function sendBookingCreatedEmails(booking: BookingCreatedEmail) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(
-      `Booking email skipped for ${booking.reference}: RESEND_API_KEY is not configured.`,
-    );
+    console.warn(`Booking emails skipped for ${booking.reference}: RESEND_API_KEY is not configured.`);
     return { sent: false as const, reason: "not_configured" as const };
   }
 
   const resend = new Resend(apiKey);
   const from = pikkoEmailSender();
-  const lines = scheduleLines(booking.slots, booking.timezone);
-  const safeUrl = escapeHtml(booking.bookingUrl);
-  const instructions = booking.manualPaymentInstructions?.trim();
-  const { data, error } = await resend.emails.send(
-    {
-      from,
-      to: booking.customerEmail,
-      subject: `Your Pikko booking ${booking.reference}`,
-      text: [
-        `Hi ${booking.customerName},`,
-        "",
-        `Your booking request with ${booking.merchantName} at ${booking.siteName} has been received.`,
-        `Court: ${booking.courtName}`,
-        ...lines.map((line) => `Schedule: ${line}`),
-        `Total: ${formatPeso(booking.totalCents)}`,
-        `Payment deadline: ${formatDateTime(booking.paymentDueAt, booking.timezone)}`,
-        instructions ? `Payment instructions: ${instructions}` : "",
-        "",
-        "Open and manage your booking using this private link:",
-        booking.bookingUrl,
-        "",
-        "Keep this link private. Anyone with the link can view this booking.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      html: `
-        <!doctype html>
-        <html lang="en">
-          <body style="margin:0;background:#f7f5eb;color:#173d32;font-family:Arial,sans-serif;">
-            <div style="display:none;max-height:0;overflow:hidden;">Return to booking ${escapeHtml(booking.reference)} anytime using your private link.</div>
-            <div style="max-width:600px;margin:0 auto;padding:32px 18px;">
-              <div style="background:#173d32;border-radius:24px;padding:30px;color:#ffffff;">
-                <div style="font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#c9f46a;">Booking received</div>
-                <h1 style="margin:12px 0 0;font-size:32px;line-height:1.15;">Keep your booking link handy.</h1>
-                <p style="margin:16px 0 0;color:#d9e5df;line-height:1.6;">Hi ${escapeHtml(booking.customerName)}, your request with ${escapeHtml(booking.merchantName)} has been recorded.</p>
-              </div>
-              <div style="background:#ffffff;border:1px solid #d9ddd5;border-radius:20px;margin-top:18px;padding:24px;">
-                <div style="font-size:13px;color:#68756f;">Reference</div>
-                <div style="margin-top:4px;font-size:20px;font-weight:800;">${escapeHtml(booking.reference)}</div>
-                <div style="margin-top:20px;font-size:13px;color:#68756f;">Venue</div>
-                <div style="margin-top:4px;font-weight:700;">${escapeHtml(booking.merchantName)} · ${escapeHtml(booking.siteName)}</div>
-                <div style="margin-top:20px;font-size:13px;color:#68756f;">Court and schedule</div>
-                <div style="margin-top:4px;font-weight:700;">${escapeHtml(booking.courtName)}</div>
-                ${lines.map((line) => `<div style="margin-top:6px;line-height:1.5;">${escapeHtml(line)}</div>`).join("")}
-                <div style="margin-top:20px;font-size:13px;color:#68756f;">Total due</div>
-                <div style="margin-top:4px;font-size:24px;font-weight:800;">${escapeHtml(formatPeso(booking.totalCents))}</div>
-                <div style="margin-top:8px;font-size:14px;color:#68756f;">Pay by ${escapeHtml(formatDateTime(booking.paymentDueAt, booking.timezone))}</div>
-                ${instructions ? `<div style="margin-top:20px;padding:16px;border-radius:14px;background:#f7f5eb;white-space:pre-wrap;line-height:1.6;"><strong>Payment instructions</strong><br>${escapeHtml(instructions)}</div>` : ""}
-                <a href="${safeUrl}" style="display:block;margin-top:24px;padding:15px 20px;border-radius:999px;background:#173d32;color:#ffffff;text-decoration:none;text-align:center;font-weight:800;">Open my booking</a>
-                <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#68756f;">This is a private management link. Do not forward it to anyone you do not trust.</p>
-              </div>
-              <p style="margin:18px 0 0;text-align:center;font-size:12px;color:#68756f;">Pikko.ph · Find your court. Pick your time. Play.</p>
-            </div>
-          </body>
-        </html>
-      `,
-    },
-    { idempotencyKey: `booking-received-${booking.bookingId}` },
+  const schedules = scheduleLines(booking.slots, booking.timezone);
+  const customer = customerMessage(booking, schedules);
+  const merchant = merchantMessage(booking, schedules);
+  const messages = merchant ? [customer, merchant] : [customer];
+  const results = await Promise.allSettled(
+    messages.map((message) => sendMessage(resend, from, message)),
   );
-
-  if (error) {
-    throw new Error(`Resend rejected booking email: ${error.message}`);
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures.map((failure) => failure.reason),
+      `One or more booking emails failed for ${booking.reference}.`,
+    );
   }
 
-  return { sent: true as const, emailId: data?.id ?? null };
+  if (!merchant) {
+    console.warn(`Merchant email skipped for ${booking.reference}: no site or merchant contact email is configured.`);
+  }
+
+  return {
+    sent: true as const,
+    customerEmailId: results[0]?.status === "fulfilled" ? results[0].value : null,
+    merchantEmailId: merchant && results[1]?.status === "fulfilled" ? results[1].value : null,
+    merchantSkipped: !merchant,
+  };
 }

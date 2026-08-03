@@ -14,7 +14,7 @@ const feedback = {
   "invalid-mode": "The requested email test mode is invalid.",
   "provider-failed": "Resend rejected the provider simulation. Check the server logs and integration status.",
   "admin-recipient-failed":
-    "Resend could not send to your administrator inbox. The testing sender only permits the Resend account owner's email until pikko.ph is verified.",
+    "Resend could not send to your administrator inbox. Check the sender-domain status and server logs.",
 } as const;
 
 export default async function AdminEmailTestPage({
@@ -41,7 +41,11 @@ export default async function AdminEmailTestPage({
       metrics={[
         { label: "Provider", value: "Resend", note: "Vercel Marketplace integration" },
         { label: "Runtime", value: "Server", note: "API key is never sent to the browser" },
-        { label: "Domain", value: "Paused", note: "pikko.ph verification can resume later" },
+        {
+          label: "Domain",
+          value: process.env.RESEND_EMAIL_DOMAIN ? "Configured" : "Fallback",
+          note: process.env.RESEND_EMAIL_DOMAIN ?? "Resend testing sender",
+        },
         { label: "Admin recipient", value: "1", note: admin.email },
       ]}
     >
@@ -84,7 +88,7 @@ export default async function AdminEmailTestPage({
           </p>
           <h2 className="mt-2 text-xl font-black">Send to administrator</h2>
           <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
-            Sends only to your authenticated platform-admin address: <strong>{admin.email}</strong>. It will work before domain verification only when this is also the Resend account email.
+            Sends only to your authenticated platform-admin address: <strong>{admin.email}</strong>. Use this to verify real inbox delivery from the configured Pikko sender.
           </p>
           <form action={sendAdminTestEmail} className="mt-6">
             <input type="hidden" name="mode" value="admin" />
@@ -96,9 +100,11 @@ export default async function AdminEmailTestPage({
       </div>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--cream)] p-6 text-sm leading-6 text-[var(--text-muted)]">
-        <h2 className="font-black text-[var(--forest)]">Current limitation</h2>
+        <h2 className="font-black text-[var(--forest)]">Booking delivery</h2>
         <p className="mt-2">
-          Customer delivery remains paused until pikko.ph is connected and its Resend DKIM, SPF, and MX records are verified. The test mailer does not bypass that restriction.
+          {process.env.BOOKING_EMAIL_ENABLED === "true"
+            ? "Automatic customer and merchant booking notifications are enabled in this environment."
+            : "Automatic booking notifications are disabled in this environment. Enable BOOKING_EMAIL_ENABLED after the sender-domain test succeeds."}
         </p>
         <Link href="/admin" className="mt-4 inline-flex font-black text-[var(--forest)]">
           ← Back to platform administration
